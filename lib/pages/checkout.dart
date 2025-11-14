@@ -105,12 +105,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         _selectedPaymentMethod = _paymentMethods.first['id'];
       }
       if (_selectedDeliveryMethod == null && _deliveryMethods.isNotEmpty) {
-        // По умолчанию выбираем Express Delivery (второй метод)
-        if (_deliveryMethods.length >= 2) {
-          _selectedDeliveryMethod = _deliveryMethods[1]['id']; // Индекс 1 = второй метод
-        } else {
-          _selectedDeliveryMethod = _deliveryMethods.first['id'];
-        }
+        // По умолчанию выбираем первый доступный метод доставки
+        _selectedDeliveryMethod = _deliveryMethods.first['id'];
       }
       
       _isLoading = false;
@@ -144,7 +140,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       }
       final price = _deliveryMethods.first['price'];
       if (price != null) {
-        _deliveryFee = (price is num) ? price.toDouble() : double.tryParse(price.toString()) ?? _deliveryFee;
+        _deliveryFee = _parsePrice(price);
       }
     }
     if (_paymentMethods.isNotEmpty) {
@@ -466,10 +462,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
   IconData _getPaymentIcon(dynamic methodId) {
     final id = methodId.toString();
     switch (id) {
-      case '3': // Cash on Delivery
-        return Icons.money;
-      case '2': // Credit Card
+      case '1': // Credit Card
         return Icons.credit_card;
+      case '2': // Cash on Delivery
+        return Icons.money;
       default:
         return Icons.payment;
     }
@@ -552,7 +548,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 (method['id'] ?? '').toString(),
                 _getDeliveryIcon(method['id'] ?? ''),
                 method['name'] ?? '',
-                (method['price'] ?? 0).toDouble(),
+                _parsePrice(method['price']),
               );
             }).toList(),
           ),
@@ -563,13 +559,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
   IconData _getDeliveryIcon(dynamic methodId) {
     final id = methodId.toString();
     switch (id) {
-      case '2': // Standard Delivery
+      case '1': // Standard Delivery
         return Icons.local_shipping;
-      case '3': // Express Delivery
+      case '2': // Express Delivery
         return Icons.flash_on;
       default:
         return Icons.local_shipping;
     }
+  }
+
+  double _parsePrice(dynamic price) {
+    if (price is double) return price;
+    if (price is int) return price.toDouble();
+    if (price is String) {
+      return double.tryParse(price) ?? 0.0;
+    }
+    return 0.0;
   }
 
   Widget _buildDeliveryOption(String value, IconData icon, String label, double price) {
@@ -781,11 +786,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
 
       // Проверяем что методы выбраны
-      if (_selectedPaymentMethod == null) {
-        throw Exception('Выберите метод оплаты');
+      if (_selectedPaymentMethod == null || _paymentMethods.isEmpty) {
+        throw Exception('Методы оплаты недоступны. Попробуйте позже.');
       }
-      if (_selectedDeliveryMethod == null) {
-        throw Exception('Выберите метод доставки');
+      if (_selectedDeliveryMethod == null || _deliveryMethods.isEmpty) {
+        throw Exception('Методы доставки недоступны. Попробуйте позже.');
       }
 
       // Подготавливаем данные для создания заказа
@@ -793,6 +798,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         'product_id': item['id'],
         'quantity': item['quantity'],
         'price': item['price'],
+        'product_image': item['image'], // Include image
       }).toList();
 
       final orderRequest = CreateOrderRequest(
@@ -1002,6 +1008,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
             // Основной контент
             SafeArea(
+              top: true,
+              bottom: false,
               child: Column(
                 children: [
                   // Заголовок

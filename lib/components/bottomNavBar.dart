@@ -32,7 +32,7 @@ class _BottomNavBarWidgetState extends State<BottomNavBarWidget> {
         decoration: BoxDecoration(
           color: widget.page == 'plants' 
             ? const Color(0xFF3A5220) // Цвет акцента для растений
-            : widget.page == 'flowers'
+            : widget.page == 'tsvety' || widget.page == "cvety"
               ? const Color(0xFFB58484) // Цвет акцента для цветов
               : const Color(0xFFA3B6CC), // Цвет акцента для кофе
           boxShadow: [

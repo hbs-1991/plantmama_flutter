@@ -24,13 +24,27 @@ class AuthProvider extends ChangeNotifier {
         final savedUser = await _authService.getSavedUser();
         if (savedUser != null) {
           _currentUser = User.fromJson(savedUser);
+          print('AuthProvider: initialize() - пользователь загружен из сохраненных данных');
         } else {
+          print('AuthProvider: initialize() - сохраненные данные не найдены, пытаемся получить с сервера');
           final currentUser = await _authService.getCurrentUser();
           if (currentUser != null) {
             _currentUser = User.fromJson(currentUser);
+            print('AuthProvider: initialize() - пользователь получен с сервера');
+          } else {
+            print('AuthProvider: initialize() - не удалось получить данные пользователя, сбрасываем авторизацию');
+            _isLoggedIn = false;
+            await _authService.logout();
           }
         }
+      } else {
+        print('AuthProvider: initialize() - пользователь не авторизован');
       }
+    } catch (e) {
+      print('AuthProvider: initialize() - ошибка инициализации: $e');
+      // При ошибке сбрасываем состояние авторизации
+      _isLoggedIn = false;
+      _currentUser = null;
     } finally {
       _isChecking = false;
       notifyListeners();
@@ -72,29 +86,52 @@ class AuthProvider extends ChangeNotifier {
       print('AuthProvider: Регистрация уже выполняется, пропускаем');
       return false;
     }
-    
+
     _isLoading = true;
     notifyListeners();
-    
+
     try {
       print('AuthProvider: Начинаем регистрацию для $email');
       final result = await _authService.register(email, phone, password);
-      
+
       if (result != null) {
         print('AuthProvider: Регистрация успешна');
-        // Создаем User объект из результата
-        _currentUser = User(
-          id: result['id'] ?? 0,
-          username: result['username'] ?? '',
-          email: result['email'] ?? email,
-          firstName: result['first_name'] ?? '',
-          lastName: result['last_name'] ?? '',
-          phone: result['phone'] ?? phone,
-          address: result['address'] ?? '',
-          dateJoined: result['date_joined'] ?? DateTime.now().toIso8601String(),
-          token: result['token'],
-        );
-        _isLoggedIn = true;
+
+        // Проверяем, есть ли токены в результате
+        final hasTokens = result.containsKey('access') || result.containsKey('token');
+
+        if (hasTokens) {
+          // Если токены есть, устанавливаем пользователя как авторизованного
+          _currentUser = User(
+            id: result['id'] ?? 0,
+            username: result['username'] ?? '',
+            email: result['email'] ?? email,
+            firstName: result['first_name'] ?? '',
+            lastName: result['last_name'] ?? '',
+            phone: result['phone'] ?? phone,
+            address: result['address'] ?? '',
+            dateJoined: result['date_joined'] ?? DateTime.now().toIso8601String(),
+            token: result['access'] ?? result['token'],
+          );
+          _isLoggedIn = true;
+          print('AuthProvider: Пользователь авторизован после регистрации');
+        } else {
+          // Если токенов нет, создаем пользователя без авторизации
+          _currentUser = User(
+            id: result['id'] ?? 0,
+            username: result['username'] ?? '',
+            email: result['email'] ?? email,
+            firstName: result['first_name'] ?? '',
+            lastName: result['last_name'] ?? '',
+            phone: result['phone'] ?? phone,
+            address: result['address'] ?? '',
+            dateJoined: result['date_joined'] ?? DateTime.now().toIso8601String(),
+            token: null,
+          );
+          _isLoggedIn = false;
+          print('AuthProvider: Регистрация успешна, но требуется вход для получения токенов');
+        }
+
         return true;
       } else {
         print('AuthProvider: Регистрация не удалась - нет результата');

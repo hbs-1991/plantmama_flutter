@@ -795,7 +795,28 @@ class AuthService implements IAuthService {
   @override
   Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null;
+    if (token == null) {
+      print('AuthService: isLoggedIn() - токен не найден');
+      return false;
+    }
+
+    // Проверяем валидность токена, пытаясь получить информацию о пользователе
+    try {
+      final userInfo = await getUserInfo();
+      if (userInfo != null) {
+        print('AuthService: isLoggedIn() - токен валиден');
+        return true;
+      } else {
+        print('AuthService: isLoggedIn() - токен не валиден, очищаем данные');
+        await logout();
+        return false;
+      }
+    } catch (e) {
+      print('AuthService: isLoggedIn() - ошибка проверки токена: $e');
+      // При ошибке считаем, что токен не валиден
+      await logout();
+      return false;
+    }
   }
 
   @override

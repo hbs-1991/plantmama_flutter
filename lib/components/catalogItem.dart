@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/product.dart';
 import '../pages/itemInfo.dart';
 import 'package:provider/provider.dart';
@@ -98,28 +99,47 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
 
   Widget _buildDefaultIcon() {
     final section = widget.product?.sectionSlug ?? widget.page ?? '';
-    final isFlowers = section == 'flowers';
+    final isTsvety = section == 'tsvety';
     final isPlants = section == 'plants';
-    final isCafe = section == 'cafe';
-    
-    IconData icon;
+    final isCafe = section == 'kafe';
+
+    String assetPath;
     Color color;
 
-    if (isFlowers) {
-      icon = Icons.local_florist;
+    if (isTsvety) {
+      assetPath = 'assets/images/flower.svg';
       color = const Color(0xFF8B3A3A);
     } else if (isPlants) {
-      icon = Icons.eco;
+      assetPath = 'assets/images/plant.svg';
       color = const Color(0xFF4B2E2E);
     } else if (isCafe) {
-      icon = Icons.coffee;
+      assetPath = 'assets/images/coffee.svg';
       color = Colors.white; // Белая иконка для кофе
     } else {
-      icon = Icons.shopping_bag;
-      color = Colors.grey[600]!;
+      assetPath = 'assets/images/plant.svg'; // default to plant
+      color = const Color(0xFF4B2E2E); // Use plant color as default
     }
-    
-    return Icon(icon, color: color, size: 50);
+
+    return Container(
+      width: double.infinity,
+      height: 140,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Center(
+        child: SvgPicture.asset(
+          assetPath,
+          width: 60,
+          height: 60,
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        ),
+      ),
+    );
   }
 
   // Создаем красивую иконку для товара
@@ -128,13 +148,13 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
     IconData icon;
     Color color;
 
-    if (name.contains('rose') || name.contains('flower') || name.contains('tulip') || name.contains('lily')) {
+    if (name.contains('rose') || name.contains('flower') || name.contains('tulip') || name.contains('lily') || name.contains('sunflower') || name.contains('цвет') || name.contains('букет') || name.contains('роза') || name.contains('тюльпан')) {
       icon = Icons.local_florist;
       color = const Color(0xFF8B3A3A);
-    } else if (name.contains('plant') || name.contains('tree') || name.contains('cactus')) {
+    } else if (name.contains('plant') || name.contains('tree') || name.contains('cactus') || name.contains('растен') || name.contains('растение') || name.contains('комнатн') || name.contains('кактус')) {
       icon = Icons.eco;
       color = const Color(0xFF4B2E2E);
-    } else if (name.contains('coffee') || name.contains('drink') || name.contains('food')) {
+    } else if (name.contains('coffee') || name.contains('drink') || name.contains('food') || name.contains('кафе') || name.contains('кофе') || name.contains('напиток') || name.contains('еда')) {
       icon = Icons.coffee;
       color = Colors.white; // Белая иконка для кофе
     } else {
@@ -146,10 +166,10 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
       width: double.infinity,
       height: 140,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withValues(alpha: 0.3),
+          color: color.withValues(alpha: 0.5),
           width: 1,
         ),
       ),
@@ -210,14 +230,14 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
               decoration: BoxDecoration(
                 color: widget.page == 'plants' 
                   ? Colors.transparent // Убираю заливку для растений
-                  : widget.page == 'flowers'
+                  : widget.page == 'tsvety'
                     ? const Color(0xFFB58484) // Правильный цвет для цветов
                     : const Color(0xFFA3B6CC), // Правильный цвет для кофе
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: widget.page == 'plants' 
                     ? const Color(0xFF3A5220) // Правильный цвет для растений
-                    : widget.page == 'flowers'
+                    : widget.page == 'tsvety'
                       ? const Color(0xFFB58484) // Цвет границы для цветов
                       : const Color(0xFFA3B6CC), // Цвет границы для кофе
                   width: 1,
@@ -242,7 +262,7 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
                             valueColor: AlwaysStoppedAnimation<Color>(
                               widget.page == 'plants' 
                                 ? const Color(0xFF3A5220) // Правильный цвет для растений
-                                : widget.page == 'flowers'
+                                : widget.page == 'tsvety'
                                   ? const Color(0xFFB58484) // Правильный цвет для цветов
                                   : const Color(0xFFA3B6CC) // Правильный цвет для кофе
                             ),
@@ -268,7 +288,7 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
                             style: TextStyle(
                               color: widget.page == 'plants' 
                                 ? const Color(0xFF3A5220) // Правильный цвет для растений
-                                : widget.page == 'flowers'
+                                : widget.page == 'tsvety'
                                   ? const Color(0xFFB58484) // Правильный цвет для цветов
                                   : const Color(0xFFA3B6CC), // Правильный цвет для кофе
                               fontWeight: FontWeight.bold,
@@ -289,7 +309,7 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
                           style: TextStyle(
                             color: widget.page == 'plants' 
                               ? const Color(0xFF3A5220) // Правильный цвет для растений
-                              : widget.page == 'flowers'
+                              : widget.page == 'tsvety'
                                 ? const Color(0xFFB58484) // Правильный цвет для цветов
                                 : const Color(0xFFA3B6CC), // Правильный цвет для кофе
                             fontWeight: FontWeight.bold,
@@ -306,7 +326,7 @@ class _CatalogitemWidgetState extends State<CatalogitemWidget> {
                     decoration: BoxDecoration(
                       color: widget.page == 'plants' 
                         ? const Color(0xFF3A5220) // Правильный цвет для растений
-                        : widget.page == 'flowers'
+                        : widget.page == 'tsvety'
                           ? const Color(0xFFB58484) // Правильный цвет для цветов
                           : const Color(0xFFA3B6CC), // Правильный цвет для кофе
                       shape: BoxShape.circle,

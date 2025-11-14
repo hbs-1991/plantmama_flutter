@@ -91,34 +91,48 @@ class OrderService implements IOrderService {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         }),
-          // Убираем таймаут - ждем загрузки столько, сколько нужно
-        enableCache: true,
-          ttlSeconds: 300, // 5 минут кеш для заказов
-        cacheAuthorizedRequests: true,
+           // Убираем таймаут - ждем загрузки столько, сколько нужно
+        enableCache: false, // Не кешировать список заказов для актуальности
+        cacheAuthorizedRequests: false,
       );
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-        
+        print('OrderService: Полный ответ API: ${response.body}');
+
         if (jsonBody is Map<String, dynamic>) {
           if (jsonBody['results'] is List) {
             final orders = List<Order>.from(
               jsonBody['results'].map((order) => Order.fromJson(order))
             );
-            print('OrderService: Успешно загружено ${orders.length} заказов из API');
+            print('OrderService: Успешно загружено ${orders.length} заказов из API (results)');
+            return orders;
+          } else if (jsonBody['data'] is List) {
+            // Некоторые API возвращают данные в поле 'data'
+            final orders = List<Order>.from(
+              jsonBody['data'].map((order) => Order.fromJson(order))
+            );
+            print('OrderService: Успешно загружено ${orders.length} заказов из API (data)');
+            return orders;
+          } else if (jsonBody['success'] == true && jsonBody['data'] is List) {
+            // API возвращает success: true, data: [...]
+            final orders = List<Order>.from(
+              jsonBody['data'].map((order) => Order.fromJson(order))
+            );
+            print('OrderService: Успешно загружено ${orders.length} заказов из API (success+data)');
             return orders;
           }
         } else if (jsonBody is List) {
           final orders = List<Order>.from(
             jsonBody.map((order) => Order.fromJson(order))
           );
-          print('OrderService: Успешно загружено ${orders.length} заказов из API');
+          print('OrderService: Успешно загружено ${orders.length} заказов из API (direct list)');
           return orders;
         }
-        
-        print('OrderService: Неожиданная структура ответа');
+
+        print('OrderService: Неожиданная структура ответа: $jsonBody');
         throw Exception('Неожиданная структура ответа от сервера');
-        } else if (response.statusCode == 401) {
+      } else if (response.statusCode == 401) {
         print('OrderService: Неавторизованный доступ');
         throw Exception('Требуется авторизация. Войдите в систему.');
       } else {
@@ -170,11 +184,11 @@ class OrderService implements IOrderService {
         Uri.parse('${AppConfig.apiBaseUrl}/orders/checkout/'),
         headers: AppConfig.withNgrokBypass({
           'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          }),
-          body: json.encode(request.toJson()),
-        );
+        }),
+        body: json.encode(request.toJson()),
+      );
 
         if (response.statusCode == 200 || response.statusCode == 201) {
           try {
@@ -518,11 +532,6 @@ class OrderService implements IOrderService {
   @override
   Future<List<Map<String, dynamic>>> getDeliveryMethods({int? addressId, double? subtotal}) async {
     try {
-      if (!await _isApiAvailable()) {
-        print('OrderService: API недоступен, используем fallback методы доставки');
-        return getFallbackDeliveryMethods();
-      }
-
       final token = await _getToken();
       if (token == null) {
         print('OrderService: Токен не найден, используем fallback методы доставки');
@@ -540,19 +549,31 @@ class OrderService implements IOrderService {
         ttlSeconds: 3600, // 1 час кеш для методов доставки
         cacheAuthorizedRequests: true,
       );
-      
+
       if (response.statusCode == 200) {
         try {
           final jsonBody = json.decode(response.body);
           if (jsonBody is List) {
             print('OrderService: Успешно загружено ${jsonBody.length} методов доставки из API');
             return List<Map<String, dynamic>>.from(jsonBody);
+          } else if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
+            // Если API возвращает в формате pagination
+            final results = jsonBody['results'] as List;
+            print('OrderService: Успешно загружено ${results.length} методов доставки из API (paginated)');
+            return List<Map<String, dynamic>>.from(results);
+          } else if (jsonBody is Map<String, dynamic> && jsonBody.containsKey('count') && jsonBody.containsKey('results')) {
+            // Обработка paginated response
+            final results = jsonBody['results'] as List?;
+            if (results != null) {
+              print('OrderService: Успешно загружено ${results.length} методов доставки из API (paginated format)');
+              return List<Map<String, dynamic>>.from(results);
+            }
           }
         } catch (e) {
           print('OrderService: Ошибка парсинга методов доставки: $e');
         }
       }
-      
+
       print('OrderService: Используем fallback методы доставки');
       return getFallbackDeliveryMethods();
     } catch (e) {
@@ -565,41 +586,51 @@ class OrderService implements IOrderService {
   @override
   Future<List<Map<String, dynamic>>> getPaymentMethods({int? addressId, double? subtotal}) async {
     try {
-      if (!await _isApiAvailable()) {
-        print('OrderService: API недоступен, используем fallback методы оплаты');
-        return getFallbackPaymentMethods();
-      }
-
-      final token = await _getToken();
-      if (token == null) {
-        print('OrderService: Токен не найден, используем fallback методы оплаты');
-        return getFallbackPaymentMethods();
-      }
+      print('OrderService: Начинаем загрузку методов оплаты');
 
       final response = await CachedHttpClient.instance.get(
         Uri.parse('${AppConfig.apiBaseUrl}/orders/payment-methods/'),
         headers: AppConfig.withNgrokBypass({
-          'Authorization': 'Bearer $token',
           'Accept': 'application/json',
+          'User-Agent': 'PlantMana-Flutter-App/1.0',
         }),
         // Убираем таймаут - ждем загрузки столько, сколько нужно
         enableCache: true,
         ttlSeconds: 3600, // 1 час кеш для методов оплаты
-        cacheAuthorizedRequests: true,
+        cacheAuthorizedRequests: false, // Не кешируем без авторизации
       );
-      
+
+      print('OrderService: Ответ от API: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         try {
           final jsonBody = json.decode(response.body);
+          print('OrderService: Тело ответа: ${response.body}');
+
           if (jsonBody is List) {
-            print('OrderService: Успешно загружено ${jsonBody.length} методов оплаты из API');
+            print('OrderService: Успешно загружено ${jsonBody.length} методов оплаты из API (list)');
             return List<Map<String, dynamic>>.from(jsonBody);
+          } else if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
+            // Если API возвращает в формате pagination
+            final results = jsonBody['results'] as List;
+            print('OrderService: Успешно загружено ${results.length} методов оплаты из API (paginated)');
+            return List<Map<String, dynamic>>.from(results);
+          } else if (jsonBody is Map<String, dynamic> && jsonBody.containsKey('count') && jsonBody.containsKey('results')) {
+            // Обработка paginated response
+            final results = jsonBody['results'] as List?;
+            if (results != null) {
+              print('OrderService: Успешно загружено ${results.length} методов оплаты из API (paginated format)');
+              return List<Map<String, dynamic>>.from(results);
+            }
           }
         } catch (e) {
           print('OrderService: Ошибка парсинга методов оплаты: $e');
         }
+      } else {
+        print('OrderService: HTTP ошибка ${response.statusCode} для методов оплаты');
+        print('OrderService: Тело ошибки: ${response.body}');
       }
-      
+
       print('OrderService: Используем fallback методы оплаты');
       return getFallbackPaymentMethods();
     } catch (e) {
@@ -611,16 +642,42 @@ class OrderService implements IOrderService {
   @override
   List<Map<String, dynamic>> getFallbackDeliveryMethods() {
     return [
-      {'id': 2, 'name': 'Standard Delivery', 'price': 5.99, 'estimated_days': 3},
-      {'id': 3, 'name': 'Express Delivery', 'price': 15.99, 'estimated_days': 1},
+      {
+        'id': 1,
+        'name': 'Standard Delivery',
+        'description': 'Delivery within 3-5 business days',
+        'price': 5.99,
+        'estimated_days': 3,
+        'is_active': true
+      },
+      {
+        'id': 2,
+        'name': 'Express Delivery',
+        'description': 'Delivery within 1-2 business days',
+        'price': 15.99,
+        'estimated_days': 1,
+        'is_active': true
+      }
     ];
   }
 
   @override
   List<Map<String, dynamic>> getFallbackPaymentMethods() {
     return [
-      {'id': 3, 'name': 'Credit Card', 'is_online': true},
-      {'id': 2, 'name': 'Cash on Delivery', 'is_online': false},
+      {
+        'id': 1,
+        'name': 'Credit Card',
+        'description': 'Pay with credit or debit card',
+        'is_online': true,
+        'is_active': true
+      },
+      {
+        'id': 2,
+        'name': 'Cash on Delivery',
+        'description': 'Pay when you receive your order',
+        'is_online': false,
+        'is_active': true
+      }
     ];
   }
 } 

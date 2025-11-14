@@ -227,14 +227,14 @@ class OrderItem {
     try {
       // Обрабатываем случай, когда product передается как объект
       final product = json['product'];
-      final productId = product is Map ? product['id'] : json['product_id'];
+      final productId = product is Map ? product['id'] : (json['product_id'] ?? json['id']); // Fallback to item id if no product_id
       final productName = product is Map ? product['name'] : json['product_name'];
-      final productImage = product is Map && product['image'] != null 
-          ? product['image'] 
+      final productImage = product is Map && product['image'] != null
+          ? product['image']
           : json['product_image'] ?? '';
-      
-      print('OrderItem.fromJson: Создаем товар "$productName" с картинкой: "$productImage"');
-      
+
+      print('OrderItem.fromJson: Создаем товар "$productName" (ID: $productId) с картинкой: "$productImage"');
+
       return OrderItem(
         id: json['id'] ?? 0,
         productId: productId ?? 0,
@@ -249,7 +249,7 @@ class OrderItem {
       // Возвращаем базовый товар в случае ошибки
       return OrderItem(
         id: json['id'] ?? 0,
-        productId: json['product_id'] ?? 0,
+        productId: json['product_id'] ?? json['id'] ?? 0,
         productName: 'Товар',
         productImage: json['product_image'] ?? '',
         price: 0.0,

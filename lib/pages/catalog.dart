@@ -8,6 +8,7 @@ import '../providers/products_provider.dart';
 import '../components/filterDrawer.dart';
 
 import '../models/product.dart';
+import '../models/section.dart';
 import 'package:flutter_svg/flutter_svg.dart';
  
 
@@ -60,22 +61,16 @@ class _CatalogWidgetState extends State<CatalogWidget> {
 
   List<Product> _computeFiltered(List<Product> source) {
     if (source.isEmpty) return const [];
-    String expectedSectionSlug = '';
-    switch (widget.page) {
-      case 'цветы':
-        expectedSectionSlug = 'цветы';
-        break;
-      case 'растения':
-        expectedSectionSlug = 'растения';
-        break;
-      case 'кафе':
-        expectedSectionSlug = 'кафе';
-        break;
-      default:
-        expectedSectionSlug = widget.page; // Если нет прямого соответствия, используем slug как есть
-        break;
+    List<Product> filtered = source;
+    // Only filter by section if not on the main catalog page
+    if (widget.page != 'catalog') {
+      print('Catalog: Filtering products for section "${widget.page}"');
+      print('Catalog: Available products: ${source.map((p) => '${p.name} (${p.sectionName})').toList()}');
+      // Get section name from slug for filtering
+      final sectionName = _getSectionNameFromSlug(widget.page);
+      filtered = filtered.where((p) => p.sectionName == sectionName).toList();
+      print('Catalog: Filtered products: ${filtered.length} items');
     }
-    List<Product> filtered = source.where((p) => p.sectionSlug == expectedSectionSlug).toList();
     if (_currentFilters['search'] != null && _currentFilters['search'].toString().isNotEmpty) {
       final q = _currentFilters['search'].toString().toLowerCase();
       filtered = filtered.where((p) => p.name.toLowerCase().contains(q) || p.shortDescription.toLowerCase().contains(q)).toList();
@@ -146,6 +141,15 @@ class _CatalogWidgetState extends State<CatalogWidget> {
     });
   }
 
+  // Get section name from slug using provider
+  String _getSectionNameFromSlug(String slug) {
+    final provider = context.read<ProductsProvider>();
+    final section = provider.sections.firstWhere(
+      (s) => s.slug == slug,
+      orElse: () => Section(id: 0, name: '', slug: '', description: '', icon: '', color: '', order: 0),
+    );
+    return section.name;
+  }
   
 
 
@@ -164,11 +168,13 @@ class _CatalogWidgetState extends State<CatalogWidget> {
           onFiltersApplied: _onFiltersApplied,
         ),
         body: SafeArea(
+          top: true,
+          bottom: false,
           child: Stack(
             children: [
               // Фоновое изображение
               Positioned.fill(
-                child: widget.page == 'plants' 
+                child: widget.page == 'растения'
                   ? Image.asset(
                       'assets/images/plantbg.png',
                       fit: BoxFit.cover,
@@ -176,9 +182,9 @@ class _CatalogWidgetState extends State<CatalogWidget> {
                       height: double.infinity,
                     )
                   : SvgPicture.asset(
-                      widget.page == 'flowers'
-                        ? 'assets/images/flowerbg.svg'
-                        : 'assets/images/coffeebg.svg',
+                      widget.page == 'coffee'
+                        ? 'assets/images/coffeebg.svg'
+                        : 'assets/images/flowerbg.svg',
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,

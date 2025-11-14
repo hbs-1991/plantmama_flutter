@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.plantmana_test"
+    namespace = "cloud.plantmama"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.plantmana_test"
+        applicationId = "cloud.plantmama"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

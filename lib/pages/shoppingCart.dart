@@ -144,8 +144,9 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDECEC),
+        color: const Color.fromARGB(255, 255, 252, 252),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Color(0xFF8B3A3A), width: 1)
       ),
       child: Row(
         children: [
@@ -161,7 +162,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: const Color.fromARGB(255, 237, 237, 237),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Center(
@@ -196,8 +197,9 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${price.toInt()} TMT',
@@ -211,8 +213,8 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFF4CAF50)),
-                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFF8B3A3A)),
+                            borderRadius: BorderRadius.circular(9999),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -391,281 +393,283 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
               ),
             ),
             // Основной контент
-            Column(
-              children: [
-                // Заголовок
-                Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back, color: Colors.black), // Черная кнопка назад
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Shopping cart',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black, // Черный заголовок
-                          ),
-                          textAlign: TextAlign.center,
+            SafeArea(
+              child: Column(
+                children: [
+                  // Заголовок
+                  Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back, color: Colors.black), // Черная кнопка назад
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          setState(() { _isLoading = true; });
-                          await _loadCartData();
-                        },
-                        icon: const Icon(Icons.refresh, color: Colors.black), // Черная кнопка обновления
-                        tooltip: 'Обновить корзину',
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Основной контент
-                Expanded(
-                  child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _hasItems
-                      ? SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: Column(
-                            children: [
-                              // Товары в корзине
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8F8F8), // Чуть темнее, но все еще белый
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Cart Items',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF4B2E2E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      height: 300, // Фиксированная высота для скролла
-                                      child: ListView.builder(
-                                        shrinkWrap: true,
-                                        itemCount: _cartItems.length,
-                                        itemBuilder: (context, index) {
-                                          return _buildCartItem(_cartItems[index]);
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Промокод
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white, // Белый цвет для всех секций
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Promocode',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF4B2E2E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        border: Border(
-                                          bottom: BorderSide(
-                                            color: Colors.grey.withValues(alpha: 0.3),
-                                            style: BorderStyle.solid,
-                                            width: 1,
-                                          ),
-                                        ),
-                                      ),
-                                      child: TextField(
-                                        controller: _promoController,
-                                        decoration: const InputDecoration(
-                                          border: InputBorder.none,
-                                          contentPadding: EdgeInsets.symmetric(vertical: 12),
-                                          hintText: 'Enter promocode',
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          // TODO: Apply promocode
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF8B3A3A),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Use promocode',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Сводка заказа
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white, // Белый цвет для всех секций
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Order summary',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF4B2E2E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Subtotal',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Color(0xFF4B2E2E),
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_subtotal.toInt()} TMT',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            color: Color(0xFF4B2E2E),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Delivery',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Color(0xFF4B2E2E),
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_deliveryFee.toInt()} TMT',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            color: Color(0xFF4B2E2E),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(height: 32),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Total price',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF4B2E2E),
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_totalPrice.toInt()} TMT',
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF8B3A3A),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 20),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => CheckoutPage(page: widget.page),
-                                            ),
-                                          );
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF8B3A3A),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(vertical: 16),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Checkout',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 20),
-                            ],
+                        const Expanded(
+                          child: Text(
+                            'Shopping cart',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black, // Черный заголовок
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                        )
-                      : _buildEmptyCart(),
-                ),
-                
-                // Нижняя навигация
-                Container(
-                  height: 70,
-                  child: BottomNavBarWidget(page: widget.page),
-                ),
-              ],
+                        ),
+                        IconButton(
+                          onPressed: () async {
+                            setState(() { _isLoading = true; });
+                            await _loadCartData();
+                          },
+                          icon: const Icon(Icons.refresh, color: Colors.black), // Черная кнопка обновления
+                          tooltip: 'Обновить корзину',
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Основной контент
+                  Expanded(
+                    child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _hasItems
+                        ? SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            child: Column(
+                              children: [
+                                // Товары в корзине
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: const Color.fromARGB(255, 255, 255, 255), // Чуть темнее, но все еще белый
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Cart Items',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF4B2E2E),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      SizedBox(
+                                        height: 300, // Фиксированная высота для скролла
+                                        child: ListView.builder(
+                                          shrinkWrap: true,
+                                          itemCount: _cartItems.length,
+                                          itemBuilder: (context, index) {
+                                            return _buildCartItem(_cartItems[index]);
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 16),
+                                
+                                // Промокод
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white, // Белый цвет для всех секций
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Promocode',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF4B2E2E),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            bottom: BorderSide(
+                                              color: Colors.grey.withValues(alpha: 0.3),
+                                              style: BorderStyle.solid,
+                                              width: 1,
+                                            ),
+                                          ),
+                                        ),
+                                        child: TextField(
+                                          controller: _promoController,
+                                          decoration: const InputDecoration(
+                                            border: InputBorder.none,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                            hintText: 'Enter promocode',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            // TODO: Apply promocode
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF8B3A3A),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Use promocode',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 16),
+                                
+                                // Сводка заказа
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white, // Белый цвет для всех секций
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Order summary',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF4B2E2E),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Subtotal',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Color(0xFF4B2E2E),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_subtotal.toInt()} TMT',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              color: Color(0xFF4B2E2E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Delivery',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Color(0xFF4B2E2E),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_deliveryFee.toInt()} TMT',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              color: Color(0xFF4B2E2E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Divider(height: 32),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Total price',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF4B2E2E),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_totalPrice.toInt()} TMT',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF8B3A3A),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 20),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => CheckoutPage(page: widget.page),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF8B3A3A),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 16),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Checkout',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          )
+                        : _buildEmptyCart(),
+                  ),
+                  
+                  // Нижняя навигация
+                  Container(
+                    height: 70,
+                    child: BottomNavBarWidget(page: widget.page),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

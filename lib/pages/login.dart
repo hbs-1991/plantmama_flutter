@@ -73,6 +73,8 @@ class _LoginPageState extends State<LoginPage> {
       child: Scaffold(
         backgroundColor: Colors.black54,
         body: SafeArea(
+          top: true,
+          bottom: false,
           child: Stack(
             children: [
               // SVG фон

@@ -231,11 +231,46 @@ class _RegisterPageState extends State<RegisterPage> {
       
       if (mounted) {
         if (ok) {
-          print('RegisterPage: Регистрация успешна, переходим на главную');
-          _showMessage('Регистрация успешна!');
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
+          print('RegisterPage: Регистрация успешна');
+
+          // Проверяем, авторизован ли пользователь после регистрации
+          final authProvider = context.read<AuthProvider>();
+          if (authProvider.isLoggedIn) {
+            print('RegisterPage: Пользователь авторизован, переходим на главную');
+            _showMessage('Регистрация успешна!');
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const HomePage()),
+            );
+          } else {
+            print('RegisterPage: Пользователь не авторизован, пытаемся войти автоматически');
+            // Пытаемся войти автоматически с теми же данными
+            try {
+              final loginOk = await authProvider.login(
+                _emailController.text,
+                _passwordController.text,
+              );
+
+              if (loginOk) {
+                print('RegisterPage: Автоматический вход успешен');
+                _showMessage('Регистрация и вход успешны!');
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const HomePage()),
+                );
+              } else {
+                print('RegisterPage: Автоматический вход не удался');
+                _showMessage('Регистрация успешна! Войдите в систему.');
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              }
+            } catch (e) {
+              print('RegisterPage: Ошибка автоматического входа: $e');
+              _showMessage('Регистрация успешна! Войдите в систему.');
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+              );
+            }
+          }
         } else {
           print('RegisterPage: Регистрация не удалась');
           _showMessage('Ошибка регистрации. Попробуйте еще раз.');

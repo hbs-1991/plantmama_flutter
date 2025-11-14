@@ -1,4 +1,4 @@
-package com.example.plantmana_test
+package cloud.plantmama
 
 import io.flutter.embedding.android.FlutterActivity
 

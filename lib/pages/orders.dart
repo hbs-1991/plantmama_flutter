@@ -1,10 +1,17 @@
+import 'dart:typed_data';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:plantmana_test/pages/homepage.dart';
 import '../models/order.dart';
+import '../models/product.dart';
 import 'package:provider/provider.dart';
 import '../providers/orders_provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import '../providers/products_provider.dart';
+import '../utils/image_cache.dart' as image_cache;
 
 import '../components/safe_image.dart';
+import '../utils/image_cache.dart' as image_cache;
 // import '../components/bottomNavBar.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -25,12 +32,87 @@ class _OrdersPageState extends State<OrdersPage> {
       final ordersProvider = context.read<OrdersProvider>();
       ordersProvider.loadOrders();
       ordersProvider.loadMethods();
+      // Автоматически обновляем заказы через 2 секунды после загрузки
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && ordersProvider.orders.isEmpty && ordersProvider.state != OrdersState.loading) {
+          print('OrdersPage: Автоматическое обновление заказов...');
+          ordersProvider.refreshOrders();
+        }
+      });
     });
   }
 
   Future<void> _loadOrders() async {
     final ordersProvider = context.read<OrdersProvider>();
     await ordersProvider.loadOrders();
+  }
+
+  // Load image for order item - first try cache, then try to find product by name, then try to download
+  Future<Uint8List?> _loadOrderItemImage(OrderItem item) async {
+    try {
+      // First try to load from cache using the provided productId
+      if (item.productId > 0) {
+        final cached = await image_cache.ImageCache.loadProductImage(item.productId);
+        if (cached != null) {
+          return cached;
+        }
+      }
+
+      // If not in cache or productId is 0, try to find the product by name from products provider
+      final productsProvider = context.read<ProductsProvider>();
+      final products = productsProvider.allProducts;
+      final matchingProduct = products.firstWhere(
+        (p) => p.name == item.productName,
+        orElse: () => Product(
+          id: 0,
+          name: '',
+          slug: '',
+          sku: '',
+          categoryId: 0,
+          categoryName: '',
+          sectionName: '',
+          sectionSlug: '',
+          shortDescription: '',
+          price: 0.0,
+          currentPrice: 0.0,
+          discountPercentage: 0,
+          isFeatured: false,
+          rating: 0.0,
+          reviewCount: 0,
+          mainImage: '',
+          stock: 0,
+        ),
+      );
+
+      if (matchingProduct.id > 0) {
+        print('OrdersPage: Found product by name: ${matchingProduct.name} (ID: ${matchingProduct.id})');
+
+        // Try to load from cache using the correct product ID
+        final cached = await image_cache.ImageCache.loadProductImage(matchingProduct.id);
+        if (cached != null) {
+          return cached;
+        }
+
+        // If not in cache, try to download from the product's main image
+        if (matchingProduct.mainImage.isNotEmpty) {
+          print('OrdersPage: Attempting to download image from product: ${matchingProduct.mainImage}');
+          return await image_cache.ImageCache.downloadAndCacheImage(matchingProduct.id, matchingProduct.mainImage);
+        }
+      }
+
+      // If we have a productImage URL from the order item, try to download it
+      if (item.productImage.isNotEmpty) {
+        print('OrdersPage: Attempting to download image from order item: ${item.productImage}');
+        final productId = item.productId > 0 ? item.productId : (matchingProduct.id > 0 ? matchingProduct.id : 0);
+        return await image_cache.ImageCache.downloadAndCacheImage(productId, item.productImage);
+      }
+
+      print('OrdersPage: No image available for product "${item.productName}"');
+      return null;
+    } catch (e) {
+      print('OrdersPage: Error loading image for product "${item.productName}": $e');
+      return null;
+    }
   }
 
   // Вызов отмены не используется в текущей версии UI; оставлено на будущее
@@ -123,33 +205,33 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   // Создаем красивую иконку для товара
-  Widget _buildProductIcon(String productName) {
+  Widget _buildProductIcon(String productName, {double width = 100, double height = 100, double iconSize = 40, double fontSize = 10, bool showText = true}) {
     final name = productName.toLowerCase();
-    IconData icon;
+    String assetPath;
     Color color;
 
-    if (name.contains('rose') || name.contains('flower') || name.contains('tulip') || name.contains('lily') || name.contains('sunflower')) {
-      icon = Icons.local_florist;
+    if (name.contains('rose') || name.contains('flower') || name.contains('tulip') || name.contains('lily') || name.contains('sunflower') || name.contains('цвет') || name.contains('букет') || name.contains('роза') || name.contains('тюльпан')) {
+      assetPath = 'assets/images/flower.svg';
       color = const Color(0xFF8B3A3A);
-    } else if (name.contains('plant') || name.contains('tree') || name.contains('cactus')) {
-      icon = Icons.eco;
+    } else if (name.contains('plant') || name.contains('tree') || name.contains('cactus') || name.contains('растен') || name.contains('растение') || name.contains('комнатн') || name.contains('кактус')) {
+      assetPath = 'assets/images/plant.svg';
       color = const Color(0xFF4B2E2E);
-    } else if (name.contains('coffee') || name.contains('drink') || name.contains('food')) {
-      icon = Icons.coffee;
+    } else if (name.contains('coffee') || name.contains('drink') || name.contains('food') || name.contains('кафе') || name.contains('кофе') || name.contains('напиток') || name.contains('еда')) {
+      assetPath = 'assets/images/coffee.svg';
       color = const Color(0xFF8B3A3A);
     } else {
-      icon = Icons.shopping_bag;
-      color = Colors.grey[600]!;
+      assetPath = 'assets/images/plant.svg'; // default to plant
+      color = const Color(0xFF4B2E2E); // Use plant color as default
     }
 
     return Container(
-      width: 100,
-      height: 100,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withValues(alpha: 0.3),
+          color: color.withValues(alpha: 0.5),
           width: 1,
         ),
       ),
@@ -157,23 +239,26 @@ class _OrdersPageState extends State<OrdersPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 40,
+          SvgPicture.asset(
+            assetPath,
+            width: iconSize,
+            height: iconSize,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
           ),
-          const SizedBox(height: 4),
-          Text(
-            productName.length > 10 ? '${productName.substring(0, 10)}...' : productName,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+          if (showText) ...[
+            const SizedBox(height: 4),
+            Text(
+              productName.length > (width / 10).round() ? '${productName.substring(0, (width / 10).round())}...' : productName,
+              style: TextStyle(
+                color: color,
+                fontSize: fontSize,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+          ],
         ],
       ),
     );
@@ -201,6 +286,8 @@ class _OrdersPageState extends State<OrdersPage> {
             ),
             // Основной контент
             SafeArea(
+              top: true, // Explicitly handle top safe area
+              bottom: false, // Let bottom nav handle bottom
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Column(
@@ -359,6 +446,18 @@ class _OrdersPageState extends State<OrdersPage> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          // Дополнительная кнопка для случаев когда заказы созданы но не отображаются
+          if (ordersProvider.errorMessage?.contains('не отображаются') == true)
+            ElevatedButton.icon(
+              onPressed: () => ordersProvider.refreshOrders(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Обновить заказы'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CAF50),
+                foregroundColor: Colors.white,
+              ),
+            ),
         ],
       ),
     );
@@ -372,13 +471,13 @@ class _OrdersPageState extends State<OrdersPage> {
           Icon(
             Icons.shopping_bag_outlined,
             size: 80,
-            color: Colors.white.withValues(alpha: 0.6),
+            color: const Color.fromARGB(255, 22, 22, 22).withValues(alpha: 0.6),
           ),
           const SizedBox(height: 16),
           Text(
             'У вас пока нет заказов',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
+              color: const Color.fromARGB(255, 8, 8, 8).withValues(alpha: 0.8),
               fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
@@ -387,7 +486,7 @@ class _OrdersPageState extends State<OrdersPage> {
           Text(
             'Сделайте первый заказ в каталоге',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: const Color.fromARGB(255, 17, 17, 17).withValues(alpha: 0.6),
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -396,7 +495,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ElevatedButton(
             onPressed: () {
               // Навигация в каталог
-              Navigator.pushNamed(context, '/catalog');
+              Navigator.push(context, MaterialPageRoute(builder: (context) => HomePage()));
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF9A463C),
@@ -504,55 +603,43 @@ class _OrdersPageState extends State<OrdersPage> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Builder(
-                        builder: (context) {
-                          final productImage = order.items.first.productImage;
-                          final productName = order.items.first.productName;
-                          
-                          // Отладочная информация
-                          print('OrdersPage: Товар: $productName, Картинка: "$productImage"');
-                          
-                          if (productImage.isNotEmpty) {
-                            // Проверяем, является ли это локальным asset
-                            if (productImage.startsWith('assets/')) {
-                              return Image.asset(
-                                productImage,
+                      child: FutureBuilder<Uint8List?>(
+                        future: _loadOrderItemImage(order.items.first),
+                        builder: (context, snapshot) {
+                          print('OrdersPage: Loading image for product ${order.items.first.productId} (${order.items.first.productName}), state: ${snapshot.connectionState}');
+                          if (snapshot.connectionState == ConnectionState.done) {
+                            if (snapshot.hasData && snapshot.data != null) {
+                              print('OrdersPage: Image loaded for product ${order.items.first.productId}');
+                              return Image.memory(
+                                snapshot.data!,
                                 width: 100,
                                 height: 100,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
-                                  print('OrdersPage: Ошибка загрузки asset $productImage: $error');
-                                  return _buildProductIcon(productName);
+                                  print('OrdersPage: Error displaying image: $error');
+                                  return _buildProductIcon(order.items.first.productName);
                                 },
                               );
                             } else {
-                              // Для внешних URL используем SafeImage
-                              return SafeImage(
-                                imageUrl: productImage,
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                                sectionSlug: widget.page ?? 'orders',
-                                placeholder: Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B3A3A)),
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: _buildProductIcon(productName),
-                              );
+                              print('OrdersPage: No image available for product ${order.items.first.productId}, showing fallback');
+                              return _buildProductIcon(order.items.first.productName);
                             }
                           } else {
-                            print('OrdersPage: Картинка пустая, показываем fallback для: $productName');
-                            return _buildProductIcon(productName);
+                            // Show loading indicator while loading
+                            return Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B3A3A)),
+                                ),
+                              ),
+                            );
                           }
                         },
                       ),
@@ -761,7 +848,7 @@ class _OrdersPageState extends State<OrdersPage> {
   void _showStatusUpdateDialog(Order order) {
     String selectedStatus = order.status;
     bool isUpdating = false;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -784,6 +871,8 @@ class _OrdersPageState extends State<OrdersPage> {
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                 ],
@@ -1004,7 +1093,13 @@ class _OrdersPageState extends State<OrdersPage> {
           children: [
             const Icon(Icons.receipt_long, color: Color(0xFF8B3A3A)),
             const SizedBox(width: 8),
-            Text('Заказ #${order.orderNumber}'),
+            Expanded(
+              child: Text(
+                'Заказ #${order.orderNumber}',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -1067,12 +1162,7 @@ class _OrdersPageState extends State<OrdersPage> {
                               height: 60,
                               fit: BoxFit.cover,
                             )
-                          : Container(
-                              width: 60,
-                              height: 60,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.image, color: Colors.grey),
-                            ),
+                          : _buildProductIcon(item.productName, width: 60, height: 60, iconSize: 24, fontSize: 8),
                     ),
                     const SizedBox(width: 12),
                     

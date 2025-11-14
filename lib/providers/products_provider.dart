@@ -31,28 +31,110 @@ class ProductsProvider extends ChangeNotifier {
     try {
       _sections = await _api.getSections();
       _sections.sort((a, b) => a.order.compareTo(b.order));
-      
+
       // Отладочная информация
       print('ProductsProvider: Загружено ${_sections.length} секций');
       for (var section in _sections) {
         print('Секция: ${section.name}, изображение: ${section.image}');
       }
-      
-      // Если API не вернул данные, ждем еще
+
+      // Если API не вернул данные, используем fallback
       if (_sections.isEmpty) {
-        print('ProductsProvider: API не вернул секции, ждем загрузки...');
-        // Не используем fallback, ждем реальные данные
+        print('ProductsProvider: API не вернул секции, используем fallback');
+        _sections = _getFallbackSections();
       }
     } catch (e) {
-      print('ProductsProvider: Ошибка загрузки секций: $e, пробуем еще раз');
-      // Не используем fallback, пробуем загрузить снова
+      print('ProductsProvider: Ошибка загрузки секций: $e, используем fallback');
+      _sections = _getFallbackSections();
     } finally {
       _isLoadingSections = false;
       notifyListeners();
     }
   }
 
-  // Fallback данные для секций больше не используются
+  // Fallback данные для секций
+  List<Section> _getFallbackSections() {
+    return [
+      Section(
+        id: 1,
+        name: 'Цветы',
+        slug: 'tsvety',
+        description: 'Цветы и букеты',
+        icon: '',
+        image: null,
+        color: '#28a745',
+        order: 0,
+      ),
+      Section(
+        id: 2,
+        name: 'Растения',
+        slug: 'plants',
+        description: 'Комнатные растения',
+        icon: '',
+        image: null,
+        color: '#28a745',
+        order: 1,
+      ),
+      Section(
+        id: 3,
+        name: 'Кофе',
+        slug: 'kafe',
+        description: 'Кофе и напитки',
+        icon: '',
+        image: null,
+        color: '#28a745',
+        order: 2,
+      ),
+    ];
+  }
+
+  // Метод для получения правильного slug секции
+  String _getCorrectSectionSlug(String sectionSlug) {
+    print('ProductsProvider: _getCorrectSectionSlug("$sectionSlug")');
+
+    // Если API вернул секции, ищем совпадение по имени или slug
+    if (_sections.isNotEmpty) {
+      print('ProductsProvider: Available sections: ${_sections.map((s) => '${s.name} (${s.slug})').toList()}');
+
+      // Сначала ищем по slug
+      final sectionBySlug = _sections.firstWhere(
+        (s) => s.slug == sectionSlug,
+        orElse: () => Section(id: 0, name: '', slug: '', description: '', icon: '', color: '', order: 0),
+      );
+      if (sectionBySlug.slug.isNotEmpty) {
+        print('ProductsProvider: Found section by slug: ${sectionBySlug.slug}');
+        return sectionBySlug.slug;
+      }
+
+      // Затем ищем по имени (case insensitive)
+      final sectionByName = _sections.firstWhere(
+        (s) => s.name.toLowerCase() == sectionSlug.toLowerCase(),
+        orElse: () => Section(id: 0, name: '', slug: '', description: '', icon: '', color: '', order: 0),
+      );
+      if (sectionByName.slug.isNotEmpty) {
+        print('ProductsProvider: Found section by name: ${sectionByName.slug}');
+        return sectionByName.slug;
+      }
+    }
+
+    // Fallback mapping для известных секций
+    switch (sectionSlug.toLowerCase()) {
+      case 'цветы':
+      case 'flowers':
+        print('ProductsProvider: Using fallback mapping: цветы -> tsvety');
+        return 'tsvety';
+      case 'растения':
+      case 'plants':
+        return 'plants';
+      case 'кафе':
+      case 'cafe':
+      case 'coffee':
+        return 'kafe';
+      default:
+        print('ProductsProvider: No mapping found, using original: $sectionSlug');
+        return sectionSlug;
+    }
+  }
 
   Future<void> loadCategories() async {
     if (_isLoadingCategories) return;
@@ -121,7 +203,52 @@ class ProductsProvider extends ChangeNotifier {
 
   List<Product> productsForSection(String? sectionSlug) {
     if (sectionSlug == null || sectionSlug.isEmpty) return _allProducts;
-    return _allProducts.where((p) => p.sectionSlug == sectionSlug).toList();
+
+    // If sections are not loaded yet, use fallback mapping
+    if (_sections.isEmpty) {
+      print('ProductsProvider: Sections not loaded yet, using fallback mapping');
+      final fallbackSlug = _getFallbackSlug(sectionSlug);
+      final filtered = _allProducts.where((p) => p.sectionSlug == fallbackSlug).toList();
+      print('ProductsProvider: productsForSection("$sectionSlug") -> fallback slug "$fallbackSlug", found ${filtered.length} products');
+      return filtered;
+    }
+
+    // Получаем правильный slug для фильтрации
+    final correctSlug = _getCorrectSectionSlug(sectionSlug);
+    final filtered = _allProducts.where((p) => p.sectionSlug == correctSlug).toList();
+
+    print('ProductsProvider: productsForSection("$sectionSlug") -> using slug "$correctSlug"');
+    print('ProductsProvider: returned ${filtered.length} products');
+    print('ProductsProvider: Available products: ${_allProducts.map((p) => '${p.name} (${p.sectionSlug})').toList()}');
+
+    return filtered;
+  }
+
+  // Fallback slug mapping when sections aren't loaded
+  String _getFallbackSlug(String sectionSlug) {
+    switch (sectionSlug.toLowerCase()) {
+      case 'цветы':
+      case 'flowers':
+        return 'tsvety';
+      case 'растения':
+      case 'plants':
+        return 'plants';
+      case 'кафе':
+      case 'cafe':
+      case 'coffee':
+        return 'kafe';
+      default:
+        return sectionSlug;
+    }
+  }
+
+  // Get section name by slug
+  String _getSectionNameBySlug(String slug) {
+    final section = _sections.firstWhere(
+      (s) => s.slug == slug,
+      orElse: () => Section(id: 0, name: '', slug: '', description: '', icon: '', color: '', order: 0),
+    );
+    return section.name;
   }
 
   Future<void> loadCatalog({bool forceRefresh = false}) async {

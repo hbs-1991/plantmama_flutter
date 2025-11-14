@@ -343,26 +343,29 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Align(
-        alignment: Alignment.center,
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          child: Stack(
-            children: [
-              // SVG фон
-              Positioned.fill(
-                child: SvgPicture.asset(
-                  'assets/images/flowerbg.svg',
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: Align(
+          alignment: Alignment.center,
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            child: Stack(
+              children: [
+                // SVG фон
+                Positioned.fill(
+                  child: SvgPicture.asset(
+                    'assets/images/flowerbg.svg',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
                 ),
-              ),
-              // Основной контент
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 70),
-                child: SingleChildScrollView(
+                // Основной контент
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 70),
+                  child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.start,
@@ -761,7 +764,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -887,123 +891,125 @@ class _ChatSupportScreenState extends State<_ChatSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: widget.page == 'flowers' ? const Color(0xFFB58484) : Colors.white,
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: widget.page == 'flowers' 
-            ? const Color(0xFFB58484) 
-            : widget.page == 'plants'
-              ? const Color(0xFF3A5220)
-              : const Color(0xFFA3B6CC),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Заголовок с кнопкой закрытия
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Chat Support',
-                      style: TextStyle(
-                        color: widget.page == 'flowers' ? Colors.white : Colors.black,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: widget.page == 'flowers' ? const Color(0xFFB58484) : Colors.white,
+        body: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: widget.page == 'flowers' 
+              ? const Color(0xFFB58484) 
+              : widget.page == 'plants'
+                ? const Color(0xFF3A5220)
+                : const Color(0xFFA3B6CC),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Заголовок с кнопкой закрытия
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Chat Support',
+                        style: TextStyle(
                           color: widget.page == 'flowers' ? Colors.white : Colors.black,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          color: widget.page == 'flowers' ? const Color(0xFFB58484) : Colors.white,
-                          size: 20,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Область сообщений
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) {
-                    return _buildMessage(_messages[index]);
-                  },
-                ),
-              ),
-              
-              // Поле ввода сообщения
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                 color: Colors.white.withValues(alpha: 0.9),
-                  border: Border(
-                    top: BorderSide(
-                     color: Colors.grey.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: widget.page == 'flowers' ? Colors.white : Colors.black,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            color: widget.page == 'flowers' ? const Color(0xFFB58484) : Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: InputDecoration(
-                          hintText: 'Type your message...',
-                          hintStyle: TextStyle(color: Colors.grey[500]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        maxLines: null,
-                        onSubmitted: (_) => _sendMessage(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _sendMessage,
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: widget.page == 'flowers' 
-                          ? const Color(0xFF8B6B6B) 
-                          : const Color(0xF23A5430),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.send,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ],
+                
+                // Область сообщений
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      return _buildMessage(_messages[index]);
+                    },
+                  ),
                 ),
-              ),
-            ],
+                
+                // Поле ввода сообщения
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                   color: Colors.white.withValues(alpha: 0.9),
+                    border: Border(
+                      top: BorderSide(
+                       color: Colors.grey.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: InputDecoration(
+                            hintText: 'Type your message...',
+                            hintStyle: TextStyle(color: Colors.grey[500]),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide.none,
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          maxLines: null,
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _sendMessage,
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: widget.page == 'flowers' 
+                            ? const Color(0xFF8B6B6B) 
+                            : const Color(0xF23A5430),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

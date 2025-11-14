@@ -8,6 +8,7 @@ import '../config.dart';
 import '../utils/error_handler.dart';
 import '../utils/error_reporter.dart';
 import '../utils/app_error.dart';
+import '../utils/image_cache.dart' as image_cache;
 
 
 class CartService implements ICartService {
@@ -92,6 +93,13 @@ class CartService implements ICartService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         print('Товар успешно добавлен в корзину');
+        // Cache the product image
+        if (product.mainImage.isNotEmpty) {
+          print('CartService: Caching image for product ${product.id}: ${product.mainImage}');
+          image_cache.ImageCache.downloadAndCacheImage(product.id, product.mainImage);
+        } else {
+          print('CartService: No image to cache for product ${product.id}');
+        }
         return;
       } else {
         // При ошибке сервера сохраняем локально
@@ -450,6 +458,14 @@ class CartService implements ICartService {
     await prefs.setStringList('cart_items', cartItems);
     print('Товар добавлен в локальную корзину: ${product.name}, количество: $quantity');
     print('Локальная корзина после добавления: $cartItems');
+
+    // Cache the product image
+    if (product.mainImage.isNotEmpty) {
+      print('CartService: Caching image for product ${product.id}: ${product.mainImage}');
+      image_cache.ImageCache.downloadAndCacheImage(product.id, product.mainImage);
+    } else {
+      print('CartService: No image to cache for product ${product.id}');
+    }
   }
 
   Future<List<Map<String, dynamic>>> _getLocalCartItems() async {

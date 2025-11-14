@@ -39,11 +39,11 @@ class OrdersProvider extends ChangeNotifier {
     if (showLoading) {
       _setState(OrdersState.loading);
     }
-    
+
     try {
       _errorMessage = null;
       final orders = await _orderService.getUserOrders();
-      
+
       if (orders.isEmpty) {
         _setState(OrdersState.empty);
       } else {
@@ -63,6 +63,10 @@ class OrdersProvider extends ChangeNotifier {
       _errorMessage = _getErrorMessage(e);
       _setState(OrdersState.error);
       print('OrdersProvider: Ошибка загрузки заказов: $e');
+      // Показываем сообщение об ошибке пользователю
+      if (e.toString().contains('0 заказов')) {
+        _errorMessage = 'Заказы созданы, но не отображаются. Попробуйте обновить страницу.';
+      }
     }
   }
 
@@ -163,26 +167,42 @@ class OrdersProvider extends ChangeNotifier {
   // Загрузка методов доставки и оплаты
   Future<void> loadMethods() async {
     if (_isLoadingMethods) return;
-    
+
     _isLoadingMethods = true;
     notifyListeners();
-    
+
     try {
       _errorMessage = null;
-      
+
       // Загружаем методы параллельно
       final results = await Future.wait([
         _orderService.getDeliveryMethods(),
         _orderService.getPaymentMethods(),
       ]);
-      
+
       _deliveryMethods = results[0];
       _paymentMethods = results[1];
-      
+
       print('OrdersProvider: Загружено ${_deliveryMethods.length} методов доставки и ${_paymentMethods.length} методов оплаты');
+
+      // Если методы не загружены, используем fallback
+      if (_deliveryMethods.isEmpty) {
+        _deliveryMethods = _orderService.getFallbackDeliveryMethods();
+        print('OrdersProvider: Используем fallback методы доставки');
+      }
+      if (_paymentMethods.isEmpty) {
+        _paymentMethods = _orderService.getFallbackPaymentMethods();
+        print('OrdersProvider: Используем fallback методы оплаты');
+      }
+
     } catch (e) {
       _errorMessage = _getErrorMessage(e);
       print('OrdersProvider: Ошибка загрузки методов: $e');
+
+      // При ошибке используем fallback методы
+      _deliveryMethods = _orderService.getFallbackDeliveryMethods();
+      _paymentMethods = _orderService.getFallbackPaymentMethods();
+      print('OrdersProvider: Используем fallback методы из-за ошибки');
     } finally {
       _isLoadingMethods = false;
       notifyListeners();

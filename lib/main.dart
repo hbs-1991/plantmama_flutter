@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import './pages/homepage.dart';
@@ -19,6 +20,19 @@ import './widgets/app_error_listener.dart';
 
 void main() {
   setupLocator();
+
+  // Configure status bar
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.white, // White status bar for visibility
+    statusBarIconBrightness: Brightness.dark, // Dark icons for white background
+    statusBarBrightness: Brightness.light, // For iOS
+    systemNavigationBarColor: Colors.white, // White navigation bar
+    systemNavigationBarIconBrightness: Brightness.dark, // Dark navigation icons
+  ));
+
+  // Ensure immersive mode is disabled
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+
   // Глобальные обработчики ошибок
   FlutterError.onError = (FlutterErrorDetails details) {
     final appEx = ErrorHandler.handle(details.exception, stackTrace: details.stack, context: 'FlutterError');
@@ -52,6 +66,7 @@ class MyApp extends StatelessWidget {
           BlocProvider(create: (_) => OrdersBloc(orderService: locator.get<IOrderService>())),
         ],
         child: MaterialApp(
+          debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.redAccent),
             useMaterial3: true,
@@ -80,12 +95,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
       try {
         // Сначала инициализируем авторизацию
         await context.read<AuthProvider>().initialize();
-        
+
         // Затем последовательно загружаем данные
         await _loadDataSequentially();
-        
-        // Запускаем загрузку заказов
-        context.read<OrdersBloc>().add(OrdersRequested());
+
+        // Запускаем загрузку заказов только если пользователь авторизован
+        final isLoggedIn = context.read<AuthProvider>().isLoggedIn;
+        if (isLoggedIn) {
+          context.read<OrdersBloc>().add(OrdersRequested());
+        }
       } catch (e) {
         print('AuthWrapper: Ошибка инициализации: $e');
         // Продолжаем работу даже при ошибках
