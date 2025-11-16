@@ -1,40 +1,26 @@
-name: Build APK
+name: Build and distribute
 
 on:
   push:
     branches:
-      - main  # Trigger the build on every push to the main branch
-  workflow_dispatch:  # Allows for manual triggering of the workflow from GitHub UI
+      - main
 
 jobs:
   build:
-    name: Build Flutter APK
-    runs-on: ubuntu-latest  # Using Ubuntu for the build
-
+    name: build
+    runs-on: ubuntu-latest
     steps:
-    # Step 1: Checkout the repository
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v2
 
-    # Step 2: Set up Flutter
-    - name: Set up Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.38.1'  # Set to Flutter 3.38.1
-
-    # Step 3: Install dependencies
-    - name: Install dependencies
-      run: |
-        flutter pub get
-
-    # Step 4: Build APK
-    - name: Build APK
-      run: |
-        flutter build apk --release
-
-    # Step 5: Upload the APK as an artifact
-    - name: Upload APK as artifact
-      uses: actions/upload-artifact@v3  # Use v3 for the upload artifact action
-      with:
-        name: app-release.apk
-        path: build/app/outputs/flutter-apk/app-release.apk
+      - uses: cedvdb/action-flutter-build-android@v1
+        with:
+          # optionals
+          build-cmd: flutter build apk --release --flavor dev
+          working-directory: ./
+          
+      - name: Archive APK
+        uses: actions/upload-artifact@v2
+        with:
+          name: release-apk
+          # Try running the build locally with the build command to be sure of this path
+          path: build/app/outputs/flutter-apk/app-dev-release.apk
