@@ -1,33 +1,49 @@
-name: iOS Build & Upload
+name: iOS Release
 
 on:
   push:
     branches:
-      - main   # или ветка, с которой хочешь билдить
+      - main  # или твоя ветка для релизов
+  workflow_dispatch:
 
 jobs:
   build-ios:
+    name: Build & Upload iOS App
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.38.1' # или твоя версия
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
+    - name: Install dependencies
+      run: |
+        flutter pub get
+        cd ios
+        pod install
+        cd ..
 
-      - name: Build iOS
-        run: |
-          flutter clean
-          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+    - name: Build IPA
+      run: |
+        flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
-      - name: Upload to App Store Connect
-        uses: r0adkll/upload-artifact@v4  # временно сохраняем IPA
-        with:
-          name: AppIPA
-          path: build/ios/ipa/*.ipa
+    - name: Upload IPA artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AppIPA
+        path: build/ios/ipa/*.ipa
+
+    - name: Install fastlane
+      run: sudo gem install fastlane
+
+    - name: Upload to App Store Connect
+      run: fastlane ios upload
+      env:
+        APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        FASTLANE_SKIP_UPDATE_CHECK: 1
