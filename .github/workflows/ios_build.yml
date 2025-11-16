@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-ios:
-    name: Build & Upload iOS App
+  upload-ios:
+    name: Upload iOS App
     runs-on: macos-latest
 
     steps:
@@ -16,44 +16,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2️⃣ Устанавливаем Flutter
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: "3.38.1"
-        channel: stable
-        architecture: x64
-
-    # 3️⃣ Устанавливаем зависимости Flutter и CocoaPods
-    - name: Install dependencies
-      run: |
-        flutter pub get
-        cd ios
-        pod install
-        cd ..
-
+    # 2️⃣ Подготавливаем App Store Connect API ключ
     - name: Prepare App Store Connect API key
       run: |
         mkdir -p fastlane
         echo ${{ secrets.APP_STORE_CONNECT_API_KEY_FILE_BASE64 }} | base64 --decode > fastlane/AuthKey_QMN99784M3.p8
 
-    # 4️⃣ Собираем неподписанный IPA
-    - name: Build IPA (no codesign)
-      run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
-
-    # 5️⃣ Загружаем IPA как артефакт (на случай проверки)
-    - name: Upload IPA artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: AppIPA
-        path: build/ios/ipa/*.ipa
-
-    # 6️⃣ Устанавливаем Fastlane
+    # 3️⃣ Устанавливаем Fastlane
     - name: Install fastlane
       run: sudo gem install fastlane
 
-    # 7️⃣ Заливаем IPA в App Store Connect
-    - name: Upload to App Store Connect
+    # 4️⃣ Загружаем готовый IPA в App Store Connect
+    - name: Upload IPA to App Store Connect
       working-directory: ./fastlane   # Fastfile должен быть здесь
       run: fastlane ios upload
       env:
