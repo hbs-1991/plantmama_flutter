@@ -3,38 +3,38 @@ name: Build APK
 on:
   push:
     branches:
-      - main  # Это будет запускать процесс сборки на каждый push в main
-  workflow_dispatch:  # Это позволит запускать процесс вручную через интерфейс GitHub
+      - main  # Trigger the build on every push to the main branch
+  workflow_dispatch:  # Allows for manual triggering of the workflow from GitHub UI
 
 jobs:
   build:
     name: Build Flutter APK
-    runs-on: ubuntu-latest  # Мы будем использовать Ubuntu для сборки
+    runs-on: ubuntu-latest  # Using Ubuntu for the build
 
     steps:
-    # Шаг 1: Клонируем репозиторий
+    # Step 1: Checkout the repository
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Шаг 2: Устанавливаем Flutter
+    # Step 2: Set up Flutter
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.38.1'  # Укажите вашу версию Flutter
+        flutter-version: '3.38.1'  # Set to Flutter 3.38.1
 
-    # Шаг 3: Устанавливаем зависимости Flutter
+    # Step 3: Install dependencies
     - name: Install dependencies
       run: |
         flutter pub get
 
-    # Шаг 4: Сборка APK
+    # Step 4: Build APK
     - name: Build APK
       run: |
         flutter build apk --release
 
-    # Шаг 5: Загружаем собранный APK как артефакт (чтобы его можно было скачать)
+    # Step 5: Upload the APK as an artifact
     - name: Upload APK as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v2  # Use v2 for upload artifact action
       with:
         name: app-release.apk
         path: build/app/outputs/flutter-apk/app-release.apk
