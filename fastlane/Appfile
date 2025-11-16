@@ -8,4 +8,4 @@ app_identifier("cloud.plantmama")
 apple_id("beza_9191@mail.ru") # можно любой Apple ID (он не используется)
 team_id("TJT4JU6AJ3")
 
-api_key_path("api_key.json")
+# api_key_path("api_key.json")
