@@ -26,10 +26,18 @@ jobs:
     - name: Install fastlane
       run: sudo gem install fastlane
 
+    - name: Check if IPA exists
+      run: |
+        ls ./plantmama_flutter/build/ios/ipa/
+        if [ ! -f ./build/ios/ipa/plantmana_test.ipa ]; then
+          echo "IPA file does not exist!"
+          exit 1
+        fi
+
     # 4️⃣ Указываем путь к вашему IPA и загружаем его в App Store Connect
     - name: Upload IPA to App Store Connect
       run: |
-        fastlane deliver --ipa ./plantmama_flutter/build/ios/ipa/plantmana_test.ipa --skip_binary_upload true
+        fastlane deliver --ipa ./build/ios/ipa/plantmana_test.ipa --skip_binary_upload true
       env:
         APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
