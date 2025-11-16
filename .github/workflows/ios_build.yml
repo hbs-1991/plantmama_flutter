@@ -42,8 +42,11 @@ jobs:
     - name: Install fastlane
       run: sudo gem install fastlane
 
+    
+
     - name: Upload to App Store Connect
       run: fastlane ios upload
+      working-directory: ./fastlane
       env:
         APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
