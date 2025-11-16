@@ -1,34 +1,33 @@
-name: Build and Deploy iOS
+name: iOS Build & Upload
 
 on:
   push:
     branches:
-      - main  # или ветка, куда пушишь код
+      - main   # или ветка, с которой хочешь билдить
 
 jobs:
-  build:
+  build-ios:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.1' # укажи свою версию
+          flutter-version: '3.38.1' # или твоя версия
 
       - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS
         run: |
-          flutter pub get
-          cd ios
-          pod install
-          cd ..
+          flutter clean
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
-      - name: Build iOS release
-        run: flutter build ipa --release --no-codesign
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload to App Store Connect
+        uses: r0adkll/upload-artifact@v4  # временно сохраняем IPA
         with:
-          name: ios-ipa
+          name: AppIPA
           path: build/ios/ipa/*.ipa
