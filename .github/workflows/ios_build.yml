@@ -12,9 +12,11 @@ jobs:
     runs-on: macos-latest
 
     steps:
+    # 1️⃣ Забираем код
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # 2️⃣ Устанавливаем Flutter
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
@@ -22,6 +24,7 @@ jobs:
         channel: stable
         architecture: x64
 
+    # 3️⃣ Устанавливаем зависимости Flutter и CocoaPods
     - name: Install dependencies
       run: |
         flutter pub get
@@ -29,26 +32,26 @@ jobs:
         pod install
         cd ..
 
-    - name: Build IPA
-      run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+    # 4️⃣ Собираем неподписанный IPA
+    - name: Build IPA (no codesign)
+      run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist --no-codesign
 
-
+    # 5️⃣ Загружаем IPA как артефакт (на случай проверки)
     - name: Upload IPA artifact
       uses: actions/upload-artifact@v4
       with:
         name: AppIPA
         path: build/ios/ipa/*.ipa
 
+    # 6️⃣ Устанавливаем Fastlane
     - name: Install fastlane
       run: sudo gem install fastlane
 
-    
-
+    # 7️⃣ Заливаем IPA в App Store Connect
     - name: Upload to App Store Connect
+      working-directory: ./fastlane   # Fastfile должен быть здесь
       run: fastlane ios upload
-      working-directory: ./fastlane
       env:
-        APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         FASTLANE_SKIP_UPDATE_CHECK: 1
