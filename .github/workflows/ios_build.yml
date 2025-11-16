@@ -37,7 +37,7 @@ jobs:
     # 4️⃣ Указываем путь к вашему IPA и загружаем его в App Store Connect
     - name: Upload IPA to App Store Connect
       run: |
-        fastlane deliver --ipa ./build/ios/ipa/plantmana_test.ipa --skip_binary_upload true --api_key_path fastlane/AuthKey_QMN99784M3.p8
+        fastlane deliver --ipa ./build/ios/ipa/plantmana_test.ipa --skip_binary_upload true
       env:
         APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
