@@ -16,18 +16,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2️⃣ Подготовка API-ключа App Store Connect
+    # 2️⃣ Декодируем API-ключ и сохраняем в файл .p8
     - name: Prepare App Store Connect API key
       run: |
         mkdir -p fastlane
-        echo ${{ secrets.APP_STORE_CONNECT_API_KEY_FILE_BASE64 }} | base64 --decode > fastlane/AuthKey_QMN99784M3.p8
-        cat fastlane/AuthKey_QMN99784M3.p8  # Проверяем, что файл не пустой
+        echo "${{ secrets.APP_STORE_CONNECT_API_KEY_FILE_BASE64 }}" | base64 --decode > fastlane/AuthKey_QMN99784M3.p8
+        cat fastlane/AuthKey_QMN99784M3.p8  # Для отладки: убедись, что файл не пустой
 
     # 3️⃣ Устанавливаем Fastlane
     - name: Install fastlane
       run: sudo gem install fastlane
 
-    # 4️⃣ Проверяем существование IPA
+    # 4️⃣ Проверяем, существует ли IPA файл
     - name: Check if IPA exists
       run: |
         ls ./build/ios/ipa/
@@ -36,11 +36,13 @@ jobs:
           exit 1
         fi
 
-    # 5️⃣ Загружаем IPA в App Store Connect
+    # 5️⃣ Загружаем IPA на App Store Connect
     - name: Upload IPA to App Store Connect
       run: |
-        fastlane deliver --ipa ./build/ios/ipa/plantmana_test.ipa --skip_binary_upload true --api_key_path fastlane/AuthKey_QMN99784M3.p8
+        fastlane deliver --ipa ./build/ios/ipa/plantmana_test.ipa --skip_binary_upload true
       env:
         APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         FASTLANE_SKIP_UPDATE_CHECK: 1
+        FASTLANE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        FASTLANE_USER: ${{ secrets.APPLE_USERNAME }}
