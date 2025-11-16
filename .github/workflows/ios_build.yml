@@ -28,7 +28,7 @@ jobs:
 
     - name: Check if IPA exists
       run: |
-        ls ./plantmama_flutter/build/ios/ipa/
+        ls .//build/ios/ipa/
         if [ ! -f ./build/ios/ipa/plantmana_test.ipa ]; then
           echo "IPA file does not exist!"
           exit 1
