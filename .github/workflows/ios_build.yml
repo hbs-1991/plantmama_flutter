@@ -27,6 +27,9 @@ jobs:
     - name: Install fastlane
       run: sudo gem install fastlane
 
+    - name: Set password
+      run: EXPORT FASTLANE_PASSWORD=${{ secrets.APPLE_PASSWORD }}
+
     # 4️⃣ Проверяем, существует ли IPA файл
     - name: Check if IPA exists
       run: |
