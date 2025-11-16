@@ -3,7 +3,7 @@ name: iOS Release
 on:
   push:
     branches:
-      - main  # или твоя ветка для релизов
+      - main
   workflow_dispatch:
 
 jobs:
