@@ -39,7 +39,7 @@ jobs:
 
     # 4️⃣ Собираем неподписанный IPA
     - name: Build IPA (no codesign)
-      run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist --no-codesign
+      run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
     # 5️⃣ Загружаем IPA как артефакт (на случай проверки)
     - name: Upload IPA artifact
