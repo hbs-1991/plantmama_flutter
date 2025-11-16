@@ -1,0 +1,20 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Upload to App Store using p8 key"
+  lane :upload do
+    api_key = app_store_connect_api_key(
+      key_id: "QMN99784M3",                            # твой Key ID
+      issuer_id: "a8bb0f0d-1220-40dc-9287-0643841ca509", # твой Issuer ID
+      key_filepath: "fastlane/AuthKey_QMN99784M3.p8",     # путь к .p8 файлу
+      in_house: false                                  # если не Enterprise
+    )
+
+    deliver(
+      ipa: "/Users/abdulla/Documents/plantmama_flutter/build/ios/ipa/plantmana_test.ipa",     # путь к твоему IPA
+      skip_screenshots: true,
+      skip_metadata: true,
+      api_key: api_key
+    )
+  end
+end
