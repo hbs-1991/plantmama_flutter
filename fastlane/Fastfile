@@ -11,7 +11,7 @@ platform :ios do
     )
 
     deliver(
-      ipa: "/Users/abdulla/Documents/plantmama_flutter/build/ios/ipa/plantmana_test.ipa",     # путь к твоему IPA
+      ipa: "build/ios/ipa/plantmana_test.ipa",     # путь к твоему IPA
       skip_screenshots: true,
       skip_metadata: true,
       api_key: api_key
