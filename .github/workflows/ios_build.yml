@@ -26,10 +26,10 @@ jobs:
     - name: Install fastlane
       run: sudo gem install fastlane
 
-    # 4️⃣ Загружаем готовый IPA в App Store Connect
+    # 4️⃣ Указываем путь к вашему IPA и загружаем его в App Store Connect
     - name: Upload IPA to App Store Connect
-      working-directory: ./fastlane   # Fastfile должен быть здесь
-      run: fastlane ios upload
+      run: |
+        fastlane deliver --ipa ./plantmama_flutter/build/ios/ipa/plantmana_test.ipa --skip_binary_upload true
       env:
         APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
