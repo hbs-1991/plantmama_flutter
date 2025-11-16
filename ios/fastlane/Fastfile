@@ -1,17 +1,23 @@
 default_platform(:ios)
 
 platform :ios do
-  desc "Upload to App Store using p8 key"
+  desc "Upload to App Store using App Store Connect API key"
   lane :upload do
     api_key = app_store_connect_api_key(
-      key_id: "QMN99784M3",                            # твой Key ID
-      issuer_id: "a8bb0f0d-1220-40dc-9287-0643841ca509", # твой Issuer ID
-      key_filepath: "fastlane/AuthKey_QMN99784M3.p8",     # путь к .p8 файлу
-      in_house: false                                  # если не Enterprise
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],          # из GitHub Secrets
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],   # из GitHub Secrets
+      key_content: ENV["APP_STORE_CONNECT_API_KEY"],   # содержимое p8 ключа, из Secrets
+      in_house: false
     )
 
+    # Ищем IPA в стандартной папке сборки Flutter
+    ipa_path = Dir["build/ios/ipa/*.ipa"].first
+    if ipa_path.nil?
+      UI.user_error!("IPA не найден! Проверьте сборку Flutter.")
+    end
+
     deliver(
-      ipa: "/Users/abdulla/Documents/plantmama_flutter/build/ios/ipa/plantmana_test.ipa",     # путь к твоему IPA
+      ipa: ipa_path,
       skip_screenshots: true,
       skip_metadata: true,
       api_key: api_key
