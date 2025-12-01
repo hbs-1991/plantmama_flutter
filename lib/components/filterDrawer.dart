@@ -16,9 +16,9 @@ class FilterDrawer extends StatefulWidget {
 class _FilterDrawerState extends State<FilterDrawer> {
   final TextEditingController _searchController = TextEditingController();
   
-  List<String> _priceRanges = ['Все цены', '0-500', '500-1000', '1000-2000', '2000+'];
-  List<String> _ratingRanges = ['Все рейтинги', '4.5+', '4.0+', '3.5+', '3.0+'];
-  List<String> _stockRanges = ['Все', 'В наличии', 'Мало', 'Нет в наличии'];
+  final List<String> _priceRanges = ['Все цены', '0-500', '500-1000', '1000-2000', '2000+'];
+  final List<String> _ratingRanges = ['Все рейтинги', '4.5+', '4.0+', '3.5+', '3.0+'];
+  final List<String> _stockRanges = ['Все', 'В наличии', 'Мало', 'Нет в наличии'];
   
   String? _selectedCategory;
   String? _selectedPriceRange;
@@ -330,7 +330,7 @@ class _FilterDrawerState extends State<FilterDrawer> {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: Colors.white,
+        activeThumbColor: Colors.white,
         activeTrackColor: Colors.white.withValues(alpha: 0.3),
         inactiveThumbColor: Colors.white70,
         inactiveTrackColor: Colors.white.withValues(alpha: 0.1),

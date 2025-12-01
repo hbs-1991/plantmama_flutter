@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/address.dart';
+import '../utils/app_logger.dart';
 
 class AddressForm extends StatefulWidget {
   final Address? address;
   final Function(Address) onSave;
 
   const AddressForm({
-    Key? key,
+    super.key,
     this.address,
     required this.onSave,
-  }) : super(key: key);
+  });
 
   @override
   State<AddressForm> createState() => _AddressFormState();
@@ -70,12 +71,9 @@ class _AddressFormState extends State<AddressForm> {
   void _saveAddress() {
     if (_formKey.currentState!.validate()) {
       final finalLabel = _isCustomLabel ? _labelController.text.trim() : _selectedLabel;
-      
-      print('AddressForm: _isCustomLabel: $_isCustomLabel');
-      print('AddressForm: _selectedLabel: $_selectedLabel');
-      print('AddressForm: _labelController.text: ${_labelController.text.trim()}');
-      print('AddressForm: finalLabel: $finalLabel');
-      
+
+      AppLogger.debug('Saving address - label: $finalLabel, custom: $_isCustomLabel', tag: 'AddressForm');
+
       final address = Address(
         id: widget.address?.id ?? 0,
         label: finalLabel,
@@ -111,7 +109,7 @@ class _AddressFormState extends State<AddressForm> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                   value: _selectedLabel,
+                   initialValue: _selectedLabel,
                    decoration: const InputDecoration(
                      labelText: 'Тип адреса',
                      border: OutlineInputBorder(),

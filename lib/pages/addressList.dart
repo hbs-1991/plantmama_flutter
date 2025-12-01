@@ -7,7 +7,7 @@ import '../test_address_api.dart';
 import 'test_page.dart';
 
 class AddressListPage extends StatefulWidget {
-  const AddressListPage({Key? key}) : super(key: key);
+  const AddressListPage({super.key});
 
   @override
   State<AddressListPage> createState() => _AddressListPageState();

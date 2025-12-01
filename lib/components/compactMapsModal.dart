@@ -312,7 +312,7 @@ class CompactMapsModalState extends State<CompactMapsModal> {
             ),
           
           // Карта
-          Container(
+          SizedBox(
             height: 200,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())

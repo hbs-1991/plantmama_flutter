@@ -32,7 +32,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
   List<Map<String, dynamic>> _cartItems = [];
   bool _isLoading = true;
   double _subtotal = 0.0;
-  double _deliveryFee = 20.0;
+  final double _deliveryFee = 20.0;
   double get _totalPrice => _subtotal + _deliveryFee;
   bool get _hasItems => _cartItems.isNotEmpty;
 
@@ -378,7 +378,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Container(
+      body: SizedBox(
         width: double.infinity,
         height: double.infinity,
         child: Stack(
@@ -664,7 +664,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                   ),
                   
                   // Нижняя навигация
-                  Container(
+                  SizedBox(
                     height: 70,
                     child: BottomNavBarWidget(page: widget.page),
                   ),

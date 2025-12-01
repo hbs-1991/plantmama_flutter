@@ -61,7 +61,7 @@ class InputSanitizer {
     String digits = input.replaceAll(RegExp(r"[^0-9+]"), '');
     // Allow only one leading plus
     if (digits.contains('+')) {
-      digits = '+' + digits.replaceAll('+', '');
+      digits = '+${digits.replaceAll('+', '')}';
     }
     return _trimAndLimit(digits, maxLength);
   }

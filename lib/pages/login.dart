@@ -87,14 +87,14 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               // Основной контент
-              Container(
+              SizedBox(
                 width: double.infinity,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
+                      SizedBox(
                         width: 100,
                         height: 100,
                         child: const Icon(

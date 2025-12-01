@@ -27,7 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _notificationsEnabled = false;
   User? _currentUser;
   bool _isLoading = true;
-  bool _isUpdatingProfile = false;
+  final bool _isUpdatingProfile = false;
   
   bool get isUserAuthenticated => _currentUser != null;
 
@@ -348,7 +348,7 @@ class _SettingsPageState extends State<SettingsPage> {
         bottom: false,
         child: Align(
           alignment: Alignment.center,
-          child: Container(
+          child: SizedBox(
             width: double.infinity,
             height: double.infinity,
             child: Stack(

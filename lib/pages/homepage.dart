@@ -44,7 +44,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             // Основной контент
-            Container(
+            SizedBox(
               width: double.infinity,
           child: Column(
             children: [

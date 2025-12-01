@@ -366,7 +366,7 @@ class _ItemInfoPageState extends State<ItemInfoPage> {
             ),
           )
         else
-          ..._reviews.map((review) => _buildReviewCard(review)).toList(),
+          ..._reviews.map((review) => _buildReviewCard(review)),
       ],
     );
   }
@@ -550,7 +550,7 @@ class _ItemInfoPageState extends State<ItemInfoPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Container(
+        child: SizedBox(
           width: double.infinity,
           height: double.infinity,
           child: Stack(

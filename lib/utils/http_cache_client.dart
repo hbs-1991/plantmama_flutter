@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import 'app_logger.dart';
 
 class _CacheEntry {
   _CacheEntry({
@@ -100,7 +101,7 @@ class _PrefsCacheStore {
         return null;
       }
     } catch (e) {
-      print('CacheStore: Ошибка чтения кеша: $e');
+      AppLogger.error('Ошибка чтения кеша', tag: 'CacheStore', error: e);
       return null;
     }
   }
@@ -116,7 +117,7 @@ class _PrefsCacheStore {
     await prefs.setString('$_metaPrefix$hashed', json.encode(entry.toJson()));
     await prefs.setString('$_bodyPrefix$hashed', entry.body);
     } catch (e) {
-      print('CacheStore: Ошибка записи кеша: $e');
+      AppLogger.error('Ошибка записи кеша', tag: 'CacheStore', error: e);
     }
   }
 
@@ -127,7 +128,7 @@ class _PrefsCacheStore {
     await prefs.remove('$_metaPrefix$hashed');
     await prefs.remove('$_bodyPrefix$hashed');
     } catch (e) {
-      print('CacheStore: Ошибка удаления кеша: $e');
+      AppLogger.error('Ошибка удаления кеша', tag: 'CacheStore', error: e);
     }
   }
 
@@ -141,7 +142,7 @@ class _PrefsCacheStore {
       }
       }
     } catch (e) {
-      print('CacheStore: Ошибка очистки кеша: $e');
+      AppLogger.error('Ошибка очистки кеша', tag: 'CacheStore', error: e);
     }
   }
 
@@ -179,7 +180,7 @@ class _PrefsCacheStore {
         }
       }
     } catch (e) {
-      print('CacheStore: Ошибка ограничения размера кеша: $e');
+      AppLogger.error('Ошибка ограничения размера кеша', tag: 'CacheStore', error: e);
     }
   }
 
@@ -189,7 +190,7 @@ class _PrefsCacheStore {
       final keys = prefs.getKeys();
       return keys.where((k) => k.startsWith(_metaPrefix)).length;
     } catch (e) {
-      print('CacheStore: Ошибка получения размера кеша: $e');
+      AppLogger.error('Ошибка получения размера кеша', tag: 'CacheStore', error: e);
       return 0;
     }
   }
@@ -270,7 +271,7 @@ class CachedHttpClient {
 
       return response;
       } catch (e) {
-        print('CachedHttpClient: Попытка $attempt для $uri: $e');
+        AppLogger.warning('Попытка $attempt для $uri: $e', tag: 'CachedHttpClient');
         if (attempt < _maxRetries) {
           await Future.delayed(_retryDelay * attempt);
           continue;
@@ -378,8 +379,16 @@ class CachedHttpClient {
           ttlSeconds: 3600, // 1 час для предзагруженных данных
         );
       } catch (e) {
-        print('CachedHttpClient: Ошибка предзагрузки $url: $e');
+        AppLogger.error('Ошибка предзагрузки $url', tag: 'CachedHttpClient', error: e);
       }
+    }
+  }
+
+  /// Validates URL scheme - enforces HTTPS in production
+  void _enforceHttps(Uri uri) {
+    if (!kDebugMode && uri.scheme != 'https') {
+      AppLogger.error('HTTP connection blocked in production: ${uri.toString()}', tag: 'CachedHttpClient');
+      throw Exception('HTTP connections are not allowed in production. Use HTTPS.');
     }
   }
 }

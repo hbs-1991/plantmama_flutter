@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/input_sanitizer.dart';
+import '../utils/password_utils.dart';
+import '../utils/app_logger.dart';
 import 'homepage.dart';
 import 'login.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -20,6 +23,12 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isLoading = false;
   String _selectedCountryCode = '+7';
   String _formattedPhone = '';
+
+  // Validation error states
+  String? _emailError;
+  String? _phoneError;
+  String? _passwordError;
+  String? _confirmPasswordError;
 
   final List<Map<String, String>> _countryCodes = [
     {'code': '+7', 'country': 'RU', 'name': 'Россия'},
@@ -177,41 +186,82 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Future<void> _register() async {
-    if (_isLoading) {
-      print('RegisterPage: Регистрация уже выполняется, пропускаем');
-      return;
+  /// Validates all form fields and returns true if valid
+  bool _validateForm() {
+    setState(() {
+      _emailError = null;
+      _phoneError = null;
+      _passwordError = null;
+      _confirmPasswordError = null;
+    });
+
+    bool isValid = true;
+
+    // Email validation
+    if (_emailController.text.isEmpty) {
+      _emailError = 'Email обязателен';
+      isValid = false;
+    } else {
+      final sanitized = InputSanitizer.sanitizeEmail(_emailController.text);
+      final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+      if (!emailRegex.hasMatch(sanitized)) {
+        _emailError = 'Введите корректный email';
+        isValid = false;
+      }
     }
 
-    if (_emailController.text.isEmpty ||
-        _phoneController.text.isEmpty ||
-        _passwordController.text.isEmpty ||
-        _confirmPasswordController.text.isEmpty) {
-      _showMessage('Заполните все поля');
-      return;
-    }
-
-    if (_passwordController.text != _confirmPasswordController.text) {
-      _showMessage('Пароли не совпадают');
-      return;
-    }
-
-    // Получаем только цифры из номера и проверяем длину
+    // Phone validation
     String digitsOnly = _phoneController.text.replaceAll(RegExp(r'[^\d]'), '');
     int minLength = _selectedCountryCode == '+993' ? 8 : 10;
     int maxLength = _selectedCountryCode == '+993' ? 8 : 15;
-    if (digitsOnly.length < minLength) {
-      String message = _selectedCountryCode == '+993' 
+
+    if (_phoneController.text.isEmpty) {
+      _phoneError = 'Номер телефона обязателен';
+      isValid = false;
+    } else if (digitsOnly.length < minLength) {
+      _phoneError = _selectedCountryCode == '+993'
           ? 'Туркменский номер должен содержать 8 цифр'
           : 'Номер телефона должен содержать минимум 10 цифр';
-      _showMessage(message);
-      return;
-    }
-    if (digitsOnly.length > maxLength) {
-      String message = _selectedCountryCode == '+993' 
+      isValid = false;
+    } else if (digitsOnly.length > maxLength) {
+      _phoneError = _selectedCountryCode == '+993'
           ? 'Туркменский номер должен содержать ровно 8 цифр'
           : 'Номер телефона слишком длинный';
-      _showMessage(message);
+      isValid = false;
+    }
+
+    // Password validation
+    if (_passwordController.text.isEmpty) {
+      _passwordError = 'Пароль обязателен';
+      isValid = false;
+    } else {
+      final passwordError = PasswordUtils.getPasswordValidationError(_passwordController.text);
+      if (passwordError != null) {
+        _passwordError = passwordError;
+        isValid = false;
+      }
+    }
+
+    // Confirm password validation
+    if (_confirmPasswordController.text.isEmpty) {
+      _confirmPasswordError = 'Подтвердите пароль';
+      isValid = false;
+    } else if (_passwordController.text != _confirmPasswordController.text) {
+      _confirmPasswordError = 'Пароли не совпадают';
+      isValid = false;
+    }
+
+    setState(() {});
+    return isValid;
+  }
+
+  Future<void> _register() async {
+    if (_isLoading) {
+      AppLogger.debug('Регистрация уже выполняется, пропускаем', tag: 'RegisterPage');
+      return;
+    }
+
+    if (!_validateForm()) {
       return;
     }
 
@@ -220,51 +270,54 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      print('RegisterPage: Начинаем регистрацию');
+      AppLogger.debug('Начинаем регистрацию', tag: 'RegisterPage');
       final auth = context.read<AuthProvider>();
+      final digitsOnly = _phoneController.text.replaceAll(RegExp(r'[^\d]'), '');
       final fullPhone = '$_selectedCountryCode$digitsOnly';
+      final sanitizedEmail = InputSanitizer.sanitizeEmail(_emailController.text);
+
       final ok = await auth.register(
-        _emailController.text,
+        sanitizedEmail,
         fullPhone,
         _passwordController.text,
       );
-      
+
       if (mounted) {
         if (ok) {
-          print('RegisterPage: Регистрация успешна');
+          AppLogger.info('Регистрация успешна', tag: 'RegisterPage');
 
           // Проверяем, авторизован ли пользователь после регистрации
           final authProvider = context.read<AuthProvider>();
           if (authProvider.isLoggedIn) {
-            print('RegisterPage: Пользователь авторизован, переходим на главную');
+            AppLogger.debug('Пользователь авторизован, переходим на главную', tag: 'RegisterPage');
             _showMessage('Регистрация успешна!');
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const HomePage()),
             );
           } else {
-            print('RegisterPage: Пользователь не авторизован, пытаемся войти автоматически');
+            AppLogger.debug('Пользователь не авторизован, пытаемся войти автоматически', tag: 'RegisterPage');
             // Пытаемся войти автоматически с теми же данными
             try {
               final loginOk = await authProvider.login(
-                _emailController.text,
+                sanitizedEmail,
                 _passwordController.text,
               );
 
               if (loginOk) {
-                print('RegisterPage: Автоматический вход успешен');
+                AppLogger.debug('Автоматический вход успешен', tag: 'RegisterPage');
                 _showMessage('Регистрация и вход успешны!');
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (context) => const HomePage()),
                 );
               } else {
-                print('RegisterPage: Автоматический вход не удался');
+                AppLogger.debug('Автоматический вход не удался', tag: 'RegisterPage');
                 _showMessage('Регистрация успешна! Войдите в систему.');
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (context) => const LoginPage()),
                 );
               }
             } catch (e) {
-              print('RegisterPage: Ошибка автоматического входа: $e');
+              AppLogger.error('Ошибка автоматического входа', tag: 'RegisterPage', error: e);
               _showMessage('Регистрация успешна! Войдите в систему.');
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -272,13 +325,13 @@ class _RegisterPageState extends State<RegisterPage> {
             }
           }
         } else {
-          print('RegisterPage: Регистрация не удалась');
+          AppLogger.warning('Регистрация не удалась', tag: 'RegisterPage');
           _showMessage('Ошибка регистрации. Попробуйте еще раз.');
         }
       }
     } catch (e) {
       if (mounted) {
-        print('RegisterPage: Ошибка регистрации: $e');
+        AppLogger.error('Ошибка регистрации', tag: 'RegisterPage', error: e);
         _showMessage(e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
@@ -302,39 +355,55 @@ class _RegisterPageState extends State<RegisterPage> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     bool isPassword = false,
+    String? errorText,
   }) {
-    return Container(
-      width: 350,
-      height: 65,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.black54.withOpacity(0.8),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 15, right: 10),
-            child: Icon(icon, color: Colors.black54, size: 24),
-          ),
-          Expanded(
-            child: TextFormField(
-              controller: controller,
-              obscureText: isPassword,
-              keyboardType: keyboardType,
-              style: const TextStyle(color: Colors.black54, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintStyle: const TextStyle(color: Colors.black54, fontSize: 16),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 20),
-              ),
+    final hasError = errorText != null && errorText.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 350,
+          height: 65,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasError ? Colors.red : Colors.black54.withOpacity(0.8),
+              width: hasError ? 2 : 1,
             ),
           ),
-        ],
-      ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 15, right: 10),
+                child: Icon(icon, color: hasError ? Colors.red : Colors.black54, size: 24),
+              ),
+              Expanded(
+                child: TextFormField(
+                  controller: controller,
+                  obscureText: isPassword,
+                  keyboardType: keyboardType,
+                  style: const TextStyle(color: Colors.black54, fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    hintStyle: const TextStyle(color: Colors.black54, fontSize: 16),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 20),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(left: 8, top: 4),
+            child: Text(
+              errorText,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 
@@ -429,14 +498,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
               // Основной контент
-              Container(
+              SizedBox(
                 width: double.infinity,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
+                      SizedBox(
                         width: 100,
                         height: 100,
                         child: const Icon(
@@ -460,22 +529,33 @@ class _RegisterPageState extends State<RegisterPage> {
                         hintText: 'EMAIL',
                         icon: Icons.email,
                         keyboardType: TextInputType.emailAddress,
+                        errorText: _emailError,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _buildPhoneField(),
-                      const SizedBox(height: 20),
+                      if (_phoneError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, top: 4),
+                          child: Text(
+                            _phoneError!,
+                            style: const TextStyle(color: Colors.red, fontSize: 12),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
                       _buildTextField(
                         controller: _passwordController,
                         hintText: 'PASSWORD',
                         icon: Icons.lock,
                         isPassword: true,
+                        errorText: _passwordError,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _buildTextField(
                         controller: _confirmPasswordController,
                         hintText: 'CONFIRM PASSWORD',
                         icon: Icons.lock,
                         isPassword: true,
+                        errorText: _confirmPasswordError,
                       ),
                       const SizedBox(height: 50),
                       SizedBox(

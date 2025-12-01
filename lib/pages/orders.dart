@@ -270,7 +270,7 @@ class _OrdersPageState extends State<OrdersPage> {
     
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Container(
+      body: SizedBox(
         width: double.infinity,
         height: double.infinity,
         child: Stack(
@@ -918,7 +918,7 @@ class _OrdersPageState extends State<OrdersPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: selectedStatus,
+                    initialValue: selectedStatus,
                     decoration: const InputDecoration(
                       labelText: 'Новый статус',
                       border: OutlineInputBorder(),
@@ -1207,7 +1207,7 @@ class _OrdersPageState extends State<OrdersPage> {
                     ),
                   ],
                 ),
-              )).toList(),
+              )),
             ],
           ),
         ),

@@ -460,6 +460,7 @@ class OrderService implements IOrderService {
   }
 
   // Улучшенный метод обновления статуса заказа
+  @override
   Future<bool> updateOrderStatus(int orderId, String newStatus) async {
     for (int attempt = 1; attempt <= _maxRetries; attempt++) {
       try {

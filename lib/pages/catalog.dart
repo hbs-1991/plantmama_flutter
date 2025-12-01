@@ -284,7 +284,7 @@ class _CatalogWidgetState extends State<CatalogWidget> {
                               ),
                             ),
                           ),
-                          Container(
+                          SizedBox(
                             height: 40,
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
@@ -416,7 +416,7 @@ class _CatalogWidgetState extends State<CatalogWidget> {
               ),
               Align(
                 alignment: Alignment.bottomCenter,
-                child: Container(
+                child: SizedBox(
                   height: 70,
                   child: BottomNavBarWidget(page: widget.page),
                 ),

@@ -98,14 +98,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // Затем последовательно загружаем данные
         await _loadDataSequentially();
-
-        // Запускаем загрузку заказов только если пользователь авторизован
-        final isLoggedIn = context.read<AuthProvider>().isLoggedIn;
-        if (isLoggedIn) {
-          context.read<OrdersBloc>().add(OrdersRequested());
-        }
       } catch (e) {
-        print('AuthWrapper: Ошибка инициализации: $e');
+        debugPrint('AuthWrapper: Ошибка инициализации: $e');
         // Продолжаем работу даже при ошибках
       }
     });
@@ -113,39 +107,32 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _loadDataSequentially() async {
     try {
-      print('AuthWrapper: _loadDataSequentially() - начинаем загрузку данных');
-      
       // Загружаем основные данные последовательно
       await context.read<ProductsProvider>().loadSections();
       await context.read<ProductsProvider>().loadCategories();
       await context.read<ProductsProvider>().loadProducts();
-      
+
       // Загружаем пользовательские данные
       await Future.wait([
         context.read<CartProvider>().loadCart(),
         context.read<FavoritesProvider>().loadFavorites(),
       ]);
-      
+
       // Загружаем адреса и заказы (только если пользователь авторизован)
       final isLoggedIn = context.read<AuthProvider>().isLoggedIn;
-      print('AuthWrapper: _loadDataSequentially() - пользователь авторизован: $isLoggedIn');
-      
+
       if (isLoggedIn) {
-        print('AuthWrapper: _loadDataSequentially() - загружаем пользовательские данные');
         await Future.wait([
           context.read<AddressesProvider>().loadAddresses(),
           context.read<OrdersProvider>().loadOrders(),
           context.read<OrdersProvider>().loadMethods(),
         ]);
-        
-        // ✅ Запускаем OrdersBloc ТОЛЬКО после проверки авторизации и загрузки данных
-        print('AuthWrapper: _loadDataSequentially() - запускаем OrdersBloc');
+
+        // Запускаем OrdersBloc после проверки авторизации и загрузки данных
         context.read<OrdersBloc>().add(OrdersRequested());
-      } else {
-        print('AuthWrapper: _loadDataSequentially() - пользователь не авторизован, пропускаем загрузку заказов');
       }
     } catch (e) {
-      print('AuthWrapper: Ошибка загрузки данных: $e');
+      debugPrint('AuthWrapper: Ошибка загрузки данных: $e');
       // Продолжаем работу даже при ошибках
     }
   }

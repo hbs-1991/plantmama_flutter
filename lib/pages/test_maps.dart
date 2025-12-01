@@ -20,7 +20,7 @@ class _TestMapsPageState extends State<TestMapsPage> {
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(20),
-        child: Container(
+        child: SizedBox(
           width: 350,
           height: 450,
           child: const CompactMapsModal(),

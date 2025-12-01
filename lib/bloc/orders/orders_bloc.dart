@@ -25,16 +25,23 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
   }
 
   Future<void> _onOrderCancelRequested(OrderCancelRequested event, Emitter<OrdersState> emit) async {
+    emit(state.copyWith(isLoading: true, error: null));
     try {
       await orderService.cancelOrder(event.order.id);
       add(OrdersRequested());
-    } catch (_) {}
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: 'Не удалось отменить заказ: ${e.toString()}'));
+    }
   }
 
   Future<void> _onOrderReorderRequested(OrderReorderRequested event, Emitter<OrdersState> emit) async {
+    emit(state.copyWith(isLoading: true, error: null));
     try {
       await orderService.reorder(event.order.id);
-    } catch (_) {}
+      emit(state.copyWith(isLoading: false, reorderSuccess: true));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: 'Не удалось повторить заказ: ${e.toString()}'));
+    }
   }
 }
 

@@ -115,7 +115,7 @@ class _HistoryPageState extends State<HistoryPage> {
                             style: TextStyle(color: Colors.green, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 10),
-                          ...p.orders.map((order) => _buildDebugOrderCard(order)).toList(),
+                          ...p.orders.map((order) => _buildDebugOrderCard(order)),
                         ],
                       ) : const Text(
                         'ЗАКАЗОВ НЕТ!',

@@ -168,7 +168,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
           },
         ),
         body: SafeArea(
-          child: Container(
+          child: SizedBox(
             width: double.infinity,
             height: double.infinity,
             child: Stack(
@@ -268,7 +268,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                                  ),
                                ),
                             ),
-                            Container(
+                            SizedBox(
                               height: 40,
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -305,7 +305,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                                             _applyFilters();
                                           },
                                         ),
-                                      )).toList(),
+                                      )),
                                     // Добавляем отступ справа для лучшего скролла
                                     const SizedBox(width: 8),
                                   ],

@@ -1,0 +1,9 @@
+{
+  "name": "flutter-analyzer",
+  "version": "1.0.0",
+  "description": "Comprehensive Flutter/Dart code analysis for security, performance, and quality",
+  "author": {
+    "name": "Claude Code Plugin"
+  },
+  "keywords": ["flutter", "dart", "analysis", "security", "performance", "code-quality"]
+}
