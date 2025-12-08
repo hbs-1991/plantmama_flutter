@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/products_provider.dart';
 import '../components/navBar.dart';
-import '../components/bottomNavBar.dart';
 import '../components/safe_image.dart';
-import '../config.dart';
 import 'catalog.dart';
 
 class HomePage extends StatefulWidget {

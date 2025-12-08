@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/auth_provider.dart';
 import 'homepage.dart';
 import 'register.dart';
-import 'phoneLogin.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

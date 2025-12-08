@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:plantmana_test/pages/homepage.dart';
@@ -11,7 +10,6 @@ import '../providers/products_provider.dart';
 import '../utils/image_cache.dart' as image_cache;
 
 import '../components/safe_image.dart';
-import '../utils/image_cache.dart' as image_cache;
 // import '../components/bottomNavBar.dart';
 
 class OrdersPage extends StatefulWidget {

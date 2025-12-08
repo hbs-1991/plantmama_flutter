@@ -4,12 +4,18 @@ import '../services/interfaces/i_cart_service.dart';
 import '../services/interfaces/i_address_service.dart';
 import '../services/interfaces/i_product_api_service.dart';
 import '../services/interfaces/i_review_service.dart';
+import '../services/interfaces/i_search_service.dart';
+import '../services/interfaces/i_collection_service.dart';
+import '../services/interfaces/i_region_service.dart';
 import '../services/authService.dart';
 import '../services/orderService.dart' show OrderService;
 import '../services/cartService.dart';
 import '../services/addressService.dart' show AddressApiService;
 import '../services/apiTest.dart';
 import '../services/reviewService.dart';
+import '../services/searchService.dart';
+import '../services/collectionService.dart';
+import '../services/regionService.dart';
 
 class ServiceLocator {
   ServiceLocator._();
@@ -52,6 +58,15 @@ void setupLocator() {
   locator.registerSingleton<ICartService>(CartService());
   locator.registerSingleton<IProductApiService>(ProductApiService());
   locator.registerSingleton<IReviewService>(ReviewApiService());
+
+  // Search service
+  locator.registerSingleton<ISearchService>(SearchService());
+
+  // Collection service (curated product bundles)
+  locator.registerSingleton<ICollectionService>(CollectionService());
+
+  // Region service (multi-region support)
+  locator.registerSingleton<IRegionService>(RegionService());
 }
 
 

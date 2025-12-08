@@ -68,6 +68,12 @@ abstract class IAuthService {
     bool? isDefault,
   });
   Future<bool> deleteAddress(int addressId);
+
+  /// Logout from server to invalidate tokens server-side
+  /// This is more secure than just clearing local tokens
+  /// Returns true if server logout was successful, false otherwise
+  /// Note: Local tokens are always cleared regardless of server response
+  Future<bool> logoutFromServer();
 }
 
 

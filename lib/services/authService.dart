@@ -643,6 +643,48 @@ class AuthService implements IAuthService {
     AppLogger.info('User logged out, secure storage cleared', tag: 'AuthService');
   }
 
+  @override
+  Future<bool> logoutFromServer() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        // No token to invalidate, just clear local storage
+        await logout();
+        return true;
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/logout'),
+        headers: AppConfig.withNgrokBypass({
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      // Always clear local storage regardless of server response
+      await logout();
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        AppLogger.info('Server logout successful', tag: 'AuthService');
+        return true;
+      } else {
+        AppLogger.warning(
+          'Server logout returned ${response.statusCode}, local tokens cleared',
+          tag: 'AuthService',
+        );
+        return false;
+      }
+    } catch (e) {
+      // Fail gracefully - always clear local tokens even if server request fails
+      await logout();
+      AppLogger.warning(
+        'Server logout failed, local tokens cleared: $e',
+        tag: 'AuthService',
+      );
+      return false;
+    }
+  }
+
   Future<void> _saveToken(String token) async {
     await _secureStorage.saveToken(token);
   }

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:plantmana_test/components/changeNumber.dart';
 import 'package:plantmana_test/components/changeName.dart';
-import 'package:plantmana_test/components/mapsModal.dart';
 import 'package:plantmana_test/components/changePassword.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -12,7 +11,6 @@ import '../models/user.dart';
 import '../pages/login.dart';
 import '../pages/addressList.dart';
 import '../pages/orders.dart';
-import '../components/changeUsername.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class SettingsPage extends StatefulWidget {

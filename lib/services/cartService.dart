@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../utils/http_cache_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
+import '../models/cart_validation.dart';
 import './interfaces/i_cart_service.dart';
 import '../config.dart';
 import '../utils/error_handler.dart';
@@ -756,8 +757,139 @@ class CartService implements ICartService {
 
   bool _looksLikeHtml(String body, Map<String, String> headers) {
     final contentType = headers['content-type'] ?? '';
-    return body.trim().startsWith('<!DOCTYPE') || 
+    return body.trim().startsWith('<!DOCTYPE') ||
            body.trim().startsWith('<html') ||
            contentType.contains('text/html');
+  }
+
+  // ============ Cart Validation Methods ============
+
+  @override
+  Future<CartValidationResult?> validateCart({
+    required List<Map<String, dynamic>> items,
+    String deliveryMethod = 'delivery',
+    String? regionCode,
+  }) async {
+    final token = await _getToken();
+    if (token == null) {
+      print('CartService: No token for cart validation');
+      return null;
+    }
+
+    try {
+      final headers = AppConfig.withNgrokBypass({
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
+
+      if (regionCode != null) {
+        headers['X-Region-Code'] = regionCode;
+      }
+
+      // Normalize item format for API
+      final normalizedItems = items.map((item) => {
+        'product_id': item['productId'] ?? item['product_id'] ?? item['id'],
+        'quantity': item['quantity'] ?? 1,
+      }).toList();
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/cart/validate'),
+        headers: headers,
+        body: json.encode({
+          'items': normalizedItems,
+          'delivery_method': deliveryMethod,
+          if (regionCode != null) 'region_code': regionCode,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      print('Cart validation response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        if (_looksLikeHtml(response.body, response.headers)) {
+          print('CartService: HTML response from cart validation');
+          return null;
+        }
+
+        final jsonBody = json.decode(response.body);
+        final data = jsonBody['data'] ?? jsonBody;
+        return CartValidationResult.fromJson(data);
+      }
+
+      final appEx = ErrorHandler.handle(
+        'HTTP_ERROR',
+        response: response,
+        context: 'validateCart',
+      );
+      ErrorReporter.reportNow(appEx);
+      return null;
+    } catch (e) {
+      final appEx = ErrorHandler.handle(e, context: 'validateCart');
+      ErrorReporter.reportNow(appEx);
+      return null;
+    }
+  }
+
+  @override
+  Future<DeliveryFeeResult?> calculateDeliveryFee({
+    required double subtotal,
+    String? regionCode,
+    String? postalCode,
+  }) async {
+    final token = await _getToken();
+    if (token == null) {
+      print('CartService: No token for delivery fee calculation');
+      return null;
+    }
+
+    try {
+      final queryParams = <String, String>{
+        'subtotal': subtotal.toString(),
+      };
+
+      if (regionCode != null) queryParams['region_code'] = regionCode;
+      if (postalCode != null) queryParams['postal_code'] = postalCode;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/cart/delivery-fee')
+          .replace(queryParameters: queryParams);
+
+      final headers = AppConfig.withNgrokBypass({
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
+
+      final response = await CachedHttpClient.instance.get(
+        uri,
+        headers: headers,
+        enableCache: true,
+        ttlSeconds: 300, // Cache for 5 minutes
+        cacheAuthorizedRequests: true,
+      );
+
+      print('Delivery fee response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        if (_looksLikeHtml(response.body, response.headers)) {
+          print('CartService: HTML response from delivery fee endpoint');
+          return null;
+        }
+
+        final jsonBody = json.decode(response.body);
+        final data = jsonBody['data'] ?? jsonBody;
+        return DeliveryFeeResult.fromJson(data);
+      }
+
+      final appEx = ErrorHandler.handle(
+        'HTTP_ERROR',
+        response: response,
+        context: 'calculateDeliveryFee',
+      );
+      ErrorReporter.reportNow(appEx);
+      return null;
+    } catch (e) {
+      final appEx = ErrorHandler.handle(e, context: 'calculateDeliveryFee');
+      ErrorReporter.reportNow(appEx);
+      return null;
+    }
   }
 }
