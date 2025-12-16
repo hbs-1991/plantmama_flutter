@@ -29,7 +29,9 @@ class _ChangeUsernameWidgetState extends State<ChangeUsernameWidget> {
     if (user != null && mounted) {
       setState(() {
         _currentUser = user;
-        _usernameController.text = user.username;
+        // Note: FastAPI backend uses full_name instead of username
+        // This widget may be deprecated - keeping email as placeholder
+        _usernameController.text = user.email;
       });
     }
   }

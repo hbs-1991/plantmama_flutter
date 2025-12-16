@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import '../utils/http_cache_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/http_cache_client.dart';
+import '../utils/secure_storage.dart';
 import '../models/product.dart';
 import '../models/cart_validation.dart';
 import './interfaces/i_cart_service.dart';
@@ -14,16 +16,16 @@ import '../utils/image_cache.dart' as image_cache;
 
 class CartService implements ICartService {
   static final String _baseUrl = AppConfig.apiBaseUrl;
-  
-  // Кэш для результатов проверки избранного
+
+  // Cache for favorites check results
   final Map<int, bool> _favoritesCache = {};
 
+  /// Get authentication token from secure storage
   Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    return await SecureStorage.instance.getToken();
   }
 
-  // Проверка доступности API
+  /// Check if API is available
   Future<bool> _isApiAvailable() async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/cart/');
@@ -33,20 +35,19 @@ class CartService implements ICartService {
       http.Response response = await CachedHttpClient.instance.get(
         uri,
         headers: baseHeaders,
-        // Убираем таймаут - ждем загрузки столько, сколько нужно
         enableCache: true,
         ttlSeconds: 30,
       );
-      // Ответ HTML от ngrok считаем недоступностью API
+      // HTML response from ngrok means API is unavailable
       final looksHtml = _looksLikeHtml(response.body, response.headers);
       return (response.statusCode == 200 || response.statusCode == 401) && !looksHtml;
     } catch (e) {
-      print('API корзины недоступен: $e');
+      if (kDebugMode) print('Cart API unavailable: $e');
       return false;
     }
   }
 
-  // Безопасное преобразование цены
+  /// Safely parse price from various formats (String, int, double)
   double _parsePrice(dynamic price) {
     if (price == null) return 0.0;
     if (price is double) return price;
@@ -57,22 +58,22 @@ class CartService implements ICartService {
     return 0.0;
   }
 
-  // Добавить товар в корзину
+  /// Add product to cart
   @override
   Future<void> addToCart(Product product, int quantity) async {
     final token = await _getToken();
-    
+
     if (token == null) {
-      // Пользователь не авторизован - сохраняем локально
+      // User not authenticated - save locally
       await _addToLocalCart(product, quantity);
       return;
     }
 
-    // Проверяем доступность API
+    // Check API availability
     if (!await _isApiAvailable()) {
-      print('API недоступен, сохраняем локально');
+      if (kDebugMode) print('API unavailable, saving locally');
       await _addToLocalCart(product, quantity);
-      return; // Не выбрасываем исключение, просто сохраняем локально
+      return;
     }
 
     try {
@@ -87,47 +88,45 @@ class CartService implements ICartService {
           'product_id': product.id,
           'quantity': quantity,
         }),
-              );
+      );
 
-      print('Add to cart response status: ${response.statusCode}');
-      print('Add to cart response body: ${response.body}');
+      if (kDebugMode) {
+        print('Add to cart response: ${response.statusCode}');
+      }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Товар успешно добавлен в корзину');
         // Cache the product image
         if (product.mainImage.isNotEmpty) {
-          print('CartService: Caching image for product ${product.id}: ${product.mainImage}');
           image_cache.ImageCache.downloadAndCacheImage(product.id, product.mainImage);
-        } else {
-          print('CartService: No image to cache for product ${product.id}');
         }
         return;
       } else {
-        // При ошибке сервера сохраняем локально
-        print('Ошибка сервера ${response.statusCode}, сохраняем локально');
+        // On server error, save locally
+        if (kDebugMode) print('Server error ${response.statusCode}, saving locally');
         await _addToLocalCart(product, quantity);
-        return; // Не выбрасываем исключение
+        return;
       }
     } catch (e) {
-      // При любой ошибке сохраняем локально
-      print('Ошибка добавления в корзину: $e, сохраняем локально');
+      // On any error, save locally
+      if (kDebugMode) print('Error adding to cart: $e, saving locally');
       await _addToLocalCart(product, quantity);
-      return; // Не выбрасываем исключение
+      return;
     }
   }
 
-  // Получить товары из корзины
+  /// Get cart items from API or local storage
+  /// FastAPI response format: {success: bool, data: {items: [...]}}
   @override
   Future<List<Map<String, dynamic>>> getCartItems() async {
     final token = await _getToken();
-    
+
     if (token == null) {
       return await _getLocalCartItems();
     }
 
-    // Проверяем доступность API
+    // Check API availability
     if (!await _isApiAvailable()) {
-      print('API недоступен, используем локальную корзину');
+      if (kDebugMode) print('API unavailable, using local cart');
       return await _getLocalCartItems();
     }
 
@@ -140,7 +139,6 @@ class CartService implements ICartService {
       http.Response response = await CachedHttpClient.instance.get(
         uri,
         headers: baseHeaders,
-        // Убираем таймаут - ждем загрузки столько, сколько нужно
         enableCache: false,
         ttlSeconds: 0,
         cacheAuthorizedRequests: false,
@@ -148,63 +146,66 @@ class CartService implements ICartService {
 
       if (response.statusCode == 200) {
         if (_looksLikeHtml(response.body, response.headers)) {
-          print('CartService: Получен HTML от ngrok, используем локальную корзину');
+          if (kDebugMode) print('CartService: HTML response, using local cart');
           return await _getLocalCartItems();
         }
         final jsonBody = json.decode(response.body);
         dynamic items;
+
+        // FastAPI response format: {success: bool, data: {items: [...]}}
         if (jsonBody is Map<String, dynamic>) {
-          items = jsonBody['items'];
+          // Primary: FastAPI format with data wrapper
+          if (jsonBody['data'] is Map<String, dynamic>) {
+            items = (jsonBody['data'] as Map<String, dynamic>)['items'];
+          }
+          // Alternative: Direct items array
+          items ??= jsonBody['items'];
+          // Alternative: Cart wrapper
           if (items == null && jsonBody['cart'] is Map<String, dynamic>) {
             items = (jsonBody['cart'] as Map<String, dynamic>)['items'];
           }
-          if (items == null && jsonBody['data'] is Map<String, dynamic>) {
-            items = (jsonBody['data'] as Map<String, dynamic>)['items'];
-          }
-          if (items == null && jsonBody['results'] is List) {
-            items = jsonBody['results'];
+          // Alternative: Direct data array (for list endpoints)
+          if (items == null && jsonBody['data'] is List) {
+            items = jsonBody['data'];
           }
         } else if (jsonBody is List) {
           items = jsonBody;
         }
         items ??= [];
-         
-         print('API корзины - количество товаров: ${items.length}');
-         print('API корзины - данные: $items');
-         
-         // Преобразуем данные из API в нужный формат
-         List<Map<String, dynamic>> cartItems = [];
-         for (var item in items) {
-           final product = item['product'] ?? {};
-           
-           // Безопасное преобразование цены
-           final currentPrice = product['current_price'] ?? product['price'] ?? 0;
-           final price = _parsePrice(currentPrice);
-           
-           // Безопасное преобразование общей цены
-           final totalPrice = item['total_price'] ?? 0;
-           final total = _parsePrice(totalPrice);
-           
-           final cartItem = {
-             'id': product['id'] ?? 0,
-             'productId': product['id'] ?? 0,
-             'cartItemId': item['id'] ?? item['cart_item_id'] ?? item['item_id'] ?? 0,
-             'name': product['name'] ?? '',
-             'price': price,
-             'image': product['main_image'] ?? '',
-             'quantity': item['quantity'] ?? 1,
-             'category': product['category_name'] ?? '',
-             'sku': product['sku'] ?? '',
-             'totalPrice': total,
-             'addedAt': DateTime.now().toIso8601String(),
-           };
-           
-           print('Обработанный товар корзины: $cartItem');
-           cartItems.add(cartItem);
-         }
-         
-         print('Итоговый список корзины: $cartItems');
-         return cartItems;
+
+        if (kDebugMode) print('Cart API - items count: ${items.length}');
+
+        // Transform API data to internal format
+        List<Map<String, dynamic>> cartItems = [];
+        for (var item in items) {
+          final product = item['product'] ?? {};
+
+          // Safe price parsing
+          final currentPrice = product['current_price'] ?? product['price'] ?? 0;
+          final price = _parsePrice(currentPrice);
+
+          // Safe total price parsing
+          final totalPrice = item['total_price'] ?? 0;
+          final total = _parsePrice(totalPrice);
+
+          final cartItem = {
+            'id': product['id'] ?? 0,
+            'productId': product['id'] ?? 0,
+            'cartItemId': item['id'] ?? item['cart_item_id'] ?? item['item_id'] ?? 0,
+            'name': product['name'] ?? '',
+            'price': price,
+            'image': product['main_image'] ?? '',
+            'quantity': item['quantity'] ?? 1,
+            'category': product['category_name'] ?? '',
+            'sku': product['sku'] ?? '',
+            'totalPrice': total,
+            'addedAt': DateTime.now().toIso8601String(),
+          };
+
+          cartItems.add(cartItem);
+        }
+
+        return cartItems;
       } else {
         final appEx = ErrorHandler.handle('HTTP_ERROR', response: response, context: 'getCartItems');
         ErrorReporter.reportNow(appEx);
@@ -217,11 +218,11 @@ class CartService implements ICartService {
     }
   }
 
-  // Удалить товар из корзины
+  /// Remove product from cart
   @override
   Future<void> removeFromCart(int productId) async {
     final token = await _getToken();
-    
+
     if (token == null) {
       await _removeFromLocalCart(productId);
       return;
@@ -249,18 +250,17 @@ class CartService implements ICartService {
       await _removeFromLocalCart(productId);
       final appEx = ErrorHandler.handle(e, context: 'removeFromCart');
       ErrorReporter.reportNow(appEx);
-      throw AppException(type: appEx.type, message: 'Товар удален локально: ${appEx.message}', cause: appEx);
+      throw AppException(type: appEx.type, message: 'Item removed locally: ${appEx.message}', cause: appEx);
     }
   }
 
-  // Добавить в избранное
+  /// Add product to favorites
   @override
   Future<void> addToFavorites(Product product) async {
     final token = await _getToken();
-    
+
     if (token == null) {
       await _addToLocalFavorites(product);
-      // Очищаем кэш для этого товара
       _favoritesCache.remove(product.id);
       return;
     }
@@ -282,32 +282,31 @@ class CartService implements ICartService {
         await _addToLocalFavorites(product);
         final appEx = ErrorHandler.handle('HTTP_ERROR', response: response, context: 'addToFavorites');
         ErrorReporter.reportNow(appEx);
-        throw AppException(type: appEx.type, message: 'Товар сохранен в избранном локально', cause: appEx);
+        throw AppException(type: appEx.type, message: 'Item saved to favorites locally', cause: appEx);
       }
-      
-      // Очищаем кэш для этого товара
+
       _favoritesCache.remove(product.id);
     } catch (e) {
       await _addToLocalFavorites(product);
-      // Очищаем кэш для этого товара
       _favoritesCache.remove(product.id);
       final appEx = ErrorHandler.handle(e, context: 'addToFavorites');
       ErrorReporter.reportNow(appEx);
-      throw AppException(type: appEx.type, message: 'Товар сохранен в избранном локально: ${appEx.message}', cause: appEx);
+      throw AppException(type: appEx.type, message: 'Item saved to favorites locally: ${appEx.message}', cause: appEx);
     }
   }
 
-  // Получить избранные товары
+  /// Get favorite items
+  /// FastAPI response format: {success: bool, data: [...], meta: {...}}
   @override
   Future<List<Map<String, dynamic>>> getFavoriteItems() async {
     final token = await _getToken();
-    
+
     if (token == null) {
       return await _getLocalFavoriteItems();
     }
 
     try {
-      // Получаем все товары из каталога
+      // Get all products from catalog
       final catalogResponse = await CachedHttpClient.instance.get(
         Uri.parse('$_baseUrl/products/'),
         headers: {
@@ -319,29 +318,27 @@ class CartService implements ICartService {
         cacheAuthorizedRequests: true,
       );
 
-      print('Каталог API ответ: ${catalogResponse.statusCode}');
-      
+      if (kDebugMode) print('Catalog API response: ${catalogResponse.statusCode}');
+
       if (catalogResponse.statusCode == 200) {
         final catalogJson = json.decode(catalogResponse.body);
-        final allProducts = catalogJson['results'] ?? [];
-        
-        print('Получено товаров из каталога: ${allProducts.length}');
-        
-        // Фильтруем только избранные товары
+        // FastAPI format: {success, data, meta} - use 'data' instead of 'results'
+        final allProducts = catalogJson['data'] ?? catalogJson['results'] ?? [];
+
+        if (kDebugMode) print('Products from catalog: ${allProducts.length}');
+
+        // Filter only favorite items
         List<Map<String, dynamic>> favoriteItems = [];
-        
+
         for (var product in allProducts) {
           final productId = product['id'];
           if (productId != null) {
-            // Проверяем, есть ли этот товар в избранном
             final isFavorite = await isInFavorites(productId);
-            print('Товар ${product['name']} (ID: $productId) в избранном: $isFavorite');
-            
+
             if (isFavorite) {
-              // Безопасное преобразование цены
               final currentPrice = product['current_price'] ?? product['price'] ?? 0;
               final price = _parsePrice(currentPrice);
-              
+
               final favoriteItem = {
                 'id': product['id'] ?? 0,
                 'name': product['name'] ?? '',
@@ -357,14 +354,13 @@ class CartService implements ICartService {
                 'sku': product['sku'] ?? '',
                 'addedAt': DateTime.now().toIso8601String(),
               };
-              
-              print('✅ Найден товар в избранном: ${favoriteItem['name']} (ID: ${favoriteItem['id']})');
+
               favoriteItems.add(favoriteItem);
             }
           }
         }
-        
-        print('Итоговый список избранного: ${favoriteItems.length} товаров');
+
+        if (kDebugMode) print('Favorites count: ${favoriteItems.length}');
         return favoriteItems;
       } else {
         final appEx = ErrorHandler.handle('HTTP_ERROR', response: catalogResponse, context: 'getFavoriteItems');
@@ -378,14 +374,13 @@ class CartService implements ICartService {
     }
   }
 
-  // Удалить из избранного
+  /// Remove product from favorites
   @override
   Future<void> removeFromFavorites(int productId) async {
     final token = await _getToken();
-    
+
     if (token == null) {
       await _removeFromLocalFavorites(productId);
-      // Очищаем кэш для этого товара
       _favoritesCache.remove(productId);
       return;
     }
@@ -408,12 +403,10 @@ class CartService implements ICartService {
         ErrorReporter.reportNow(appEx);
         throw appEx;
       }
-      
-      // Очищаем кэш для этого товара
+
       _favoritesCache.remove(productId);
     } catch (e) {
       await _removeFromLocalFavorites(productId);
-      // Очищаем кэш для этого товара
       _favoritesCache.remove(productId);
       final appEx = ErrorHandler.handle(e, context: 'removeFromFavorites');
       ErrorReporter.reportNow(appEx);
@@ -421,12 +414,12 @@ class CartService implements ICartService {
     }
   }
 
-  // === Локальные методы для неавторизованных пользователей ===
+  // === Local methods for unauthenticated users ===
 
   Future<void> _addToLocalCart(Product product, int quantity) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> cartItems = prefs.getStringList('cart_items') ?? [];
-    
+
     Map<String, dynamic> cartItem = {
       'id': product.id,
       'name': product.name,
@@ -438,8 +431,8 @@ class CartService implements ICartService {
       'totalPrice': product.currentPrice * quantity,
       'addedAt': DateTime.now().toIso8601String(),
     };
-    
-    // Проверяем, есть ли уже такой товар
+
+    // Check if item already exists
     bool itemExists = false;
     for (int i = 0; i < cartItems.length; i++) {
       Map<String, dynamic> existingItem = json.decode(cartItems[i]);
@@ -451,53 +444,45 @@ class CartService implements ICartService {
         break;
       }
     }
-    
+
     if (!itemExists) {
       cartItems.add(json.encode(cartItem));
     }
-    
+
     await prefs.setStringList('cart_items', cartItems);
-    print('Товар добавлен в локальную корзину: ${product.name}, количество: $quantity');
-    print('Локальная корзина после добавления: $cartItems');
+    if (kDebugMode) print('Added to local cart: ${product.name}, qty: $quantity');
 
     // Cache the product image
     if (product.mainImage.isNotEmpty) {
-      print('CartService: Caching image for product ${product.id}: ${product.mainImage}');
       image_cache.ImageCache.downloadAndCacheImage(product.id, product.mainImage);
-    } else {
-      print('CartService: No image to cache for product ${product.id}');
     }
   }
 
   Future<List<Map<String, dynamic>>> _getLocalCartItems() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> cartItems = prefs.getStringList('cart_items') ?? [];
-    
-    print('Локальная корзина - количество товаров: ${cartItems.length}');
-    print('Локальная корзина - сырые данные: $cartItems');
-    
-    final decodedItems = cartItems.map((item) => json.decode(item) as Map<String, dynamic>).toList();
-    print('Локальная корзина - декодированные данные: $decodedItems');
-    
-    return decodedItems;
+
+    if (kDebugMode) print('Local cart items: ${cartItems.length}');
+
+    return cartItems.map((item) => json.decode(item) as Map<String, dynamic>).toList();
   }
 
   Future<void> _removeFromLocalCart(int productId) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> cartItems = prefs.getStringList('cart_items') ?? [];
-    
+
     cartItems.removeWhere((item) {
       Map<String, dynamic> cartItem = json.decode(item);
       return cartItem['id'] == productId;
     });
-    
+
     await prefs.setStringList('cart_items', cartItems);
   }
 
   Future<void> _addToLocalFavorites(Product product) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> favoriteItems = prefs.getStringList('favorite_items') ?? [];
-    
+
     Map<String, dynamic> favoriteItem = {
       'id': product.id,
       'name': product.name,
@@ -507,65 +492,56 @@ class CartService implements ICartService {
       'sku': product.sku,
       'addedAt': DateTime.now().toIso8601String(),
     };
-    
-    // Проверяем, нет ли уже такого товара
+
+    // Check if item already exists
     bool itemExists = favoriteItems.any((item) {
       Map<String, dynamic> existing = json.decode(item);
       return existing['id'] == product.id;
     });
-    
+
     if (!itemExists) {
       favoriteItems.add(json.encode(favoriteItem));
       await prefs.setStringList('favorite_items', favoriteItems);
-      print('Товар добавлен в локальное избранное: ${product.name}');
-      print('Локальное избранное после добавления: $favoriteItems');
-    } else {
-      print('Товар уже есть в локальном избранном: ${product.name}');
+      if (kDebugMode) print('Added to local favorites: ${product.name}');
     }
   }
 
   Future<List<Map<String, dynamic>>> _getLocalFavoriteItems() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> favoriteItems = prefs.getStringList('favorite_items') ?? [];
-    
-    print('Локальное избранное - количество товаров: ${favoriteItems.length}');
-    print('Локальное избранное - сырые данные: $favoriteItems');
-    
-    final decodedItems = favoriteItems.map((item) => json.decode(item) as Map<String, dynamic>).toList();
-    print('Локальное избранное - декодированные данные: $decodedItems');
-    
-    return decodedItems;
+
+    if (kDebugMode) print('Local favorites: ${favoriteItems.length}');
+
+    return favoriteItems.map((item) => json.decode(item) as Map<String, dynamic>).toList();
   }
 
   Future<bool> _isInLocalFavorites(int productId) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> favoriteItems = prefs.getStringList('favorite_items') ?? [];
-    
+
     for (String item in favoriteItems) {
       try {
         Map<String, dynamic> favoriteItem = json.decode(item);
         if (favoriteItem['id'] == productId) {
-          print('Товар $productId найден в локальном избранном');
           return true;
         }
       } catch (e) {
-        print('Ошибка декодирования элемента избранного: $e');
+        if (kDebugMode) print('Error decoding favorite item: $e');
       }
     }
-    
-    print('Товар $productId НЕ найден в локальном избранном');
+
     return false;
   }
 
   Future<void> _removeFromLocalFavorites(int productId) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> favoriteItems = prefs.getStringList('favorite_items') ?? [];
-    
+
     favoriteItems.removeWhere((item) {
       Map<String, dynamic> favoriteItem = json.decode(item);
       return favoriteItem['id'] == productId;
     });
-    
+
     await prefs.setStringList('favorite_items', favoriteItems);
   }
 
@@ -578,7 +554,7 @@ class CartService implements ICartService {
   Future<void> _updateLocalCartItemQuantity(int productId, int quantity) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> cartItems = prefs.getStringList('cart_items') ?? [];
-    
+
     for (int i = 0; i < cartItems.length; i++) {
       Map<String, dynamic> cartItem = json.decode(cartItems[i]);
       if (cartItem['id'] == productId) {
@@ -588,30 +564,27 @@ class CartService implements ICartService {
         break;
       }
     }
-    
+
     await prefs.setStringList('cart_items', cartItems);
   }
 
-  // Проверить, есть ли товар в избранном
+  /// Check if product is in favorites
   @override
   Future<bool> isInFavorites(int productId) async {
-    // Проверяем кэш сначала
+    // Check cache first
     if (_favoritesCache.containsKey(productId)) {
-      print('Результат из кэша для товара $productId: ${_favoritesCache[productId]}');
       return _favoritesCache[productId]!;
     }
-    
+
     final token = await _getToken();
-    
+
     if (token == null) {
-      print('Пользователь не авторизован, проверяем локальное избранное для товара $productId');
       final result = await _isInLocalFavorites(productId);
       _favoritesCache[productId] = result;
       return result;
     }
 
     try {
-      print('Проверяем избранное через API для товара $productId');
       final uri = Uri.parse('$_baseUrl/users/is_favorite/?product_id=$productId');
       Map<String, String> baseHeaders = AppConfig.withNgrokBypass({
         'Authorization': 'Bearer $token',
@@ -625,38 +598,35 @@ class CartService implements ICartService {
         cacheAuthorizedRequests: true,
       );
 
-      print('API ответ для проверки избранного товара $productId: ${response.statusCode} - ${response.body}');
-
       if (response.statusCode == 200) {
         if (_looksLikeHtml(response.body, response.headers)) {
-          print('CartService: HTML при проверке избранного — fallback к локальным данным');
+          if (kDebugMode) print('CartService: HTML in favorites check - fallback to local');
           final result = await _isInLocalFavorites(productId);
           _favoritesCache[productId] = result;
           return result;
         }
         final jsonBody = json.decode(response.body);
-        final result = jsonBody['is_favorite'] ?? false;
-        print('API результат для товара $productId: $result');
-        // Сохраняем в кэш
+        // FastAPI format: {success, data: {is_favorite}} or direct {is_favorite}
+        final data = jsonBody['data'] ?? jsonBody;
+        final result = data['is_favorite'] ?? false;
         _favoritesCache[productId] = result;
         return result;
       } else {
-        print('API вернул ошибку, используем локальную проверку для товара $productId');
-        // Fallback к локальной проверке
+        // Fallback to local check
         final result = await _isInLocalFavorites(productId);
         _favoritesCache[productId] = result;
         return result;
       }
     } catch (e) {
-      print('Ошибка проверки избранного для товара $productId: $e');
-      // Fallback к локальной проверке
+      if (kDebugMode) print('Error checking favorites for product $productId: $e');
+      // Fallback to local check
       final result = await _isInLocalFavorites(productId);
       _favoritesCache[productId] = result;
       return result;
     }
   }
 
-  // Получить количество товаров в корзине
+  /// Get total cart item count
   @override
   Future<int> getCartCount() async {
     final cartItems = await getCartItems();
@@ -672,25 +642,25 @@ class CartService implements ICartService {
     return totalCount;
   }
 
-  // Получить количество товаров в избранном
+  /// Get favorites count
   @override
   Future<int> getFavoritesCount() async {
     final favoriteItems = await getFavoriteItems();
     return favoriteItems.length;
   }
 
-  // Очистить кэш избранного
+  /// Clear favorites cache
   @override
   void clearFavoritesCache() {
     _favoritesCache.clear();
-    print('Кэш избранного очищен');
+    if (kDebugMode) print('Favorites cache cleared');
   }
 
-  // Очистить корзину
+  /// Clear cart
   @override
   Future<void> clearCart() async {
     final token = await _getToken();
-    
+
     if (token == null) {
       await _clearLocalCart();
       return;
@@ -714,15 +684,15 @@ class CartService implements ICartService {
       await _clearLocalCart();
       final appEx = ErrorHandler.handle(e, context: 'clearCart');
       ErrorReporter.reportNow(appEx);
-      throw AppException(type: appEx.type, message: 'Корзина очищена локально: ${appEx.message}', cause: appEx);
+      throw AppException(type: appEx.type, message: 'Cart cleared locally: ${appEx.message}', cause: appEx);
     }
   }
 
-  // Обновить количество товара в корзине
+  /// Update cart item quantity
   @override
   Future<void> updateCartItemQuantity(int productId, int quantity) async {
     final token = await _getToken();
-    
+
     if (token == null) {
       await _updateLocalCartItemQuantity(productId, quantity);
       return;
@@ -751,7 +721,7 @@ class CartService implements ICartService {
       await _updateLocalCartItemQuantity(productId, quantity);
       final appEx = ErrorHandler.handle(e, context: 'updateCartItemQuantity');
       ErrorReporter.reportNow(appEx);
-      throw AppException(type: appEx.type, message: 'Количество обновлено локально: ${appEx.message}', cause: appEx);
+      throw AppException(type: appEx.type, message: 'Quantity updated locally: ${appEx.message}', cause: appEx);
     }
   }
 
@@ -764,6 +734,8 @@ class CartService implements ICartService {
 
   // ============ Cart Validation Methods ============
 
+  /// Validate cart items before checkout
+  /// FastAPI response format: {success: bool, data: CartValidation}
   @override
   Future<CartValidationResult?> validateCart({
     required List<Map<String, dynamic>> items,
@@ -772,7 +744,7 @@ class CartService implements ICartService {
   }) async {
     final token = await _getToken();
     if (token == null) {
-      print('CartService: No token for cart validation');
+      if (kDebugMode) print('CartService: No token for cart validation');
       return null;
     }
 
@@ -794,7 +766,7 @@ class CartService implements ICartService {
       }).toList();
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/cart/validate'),
+        Uri.parse('${AppConfig.apiBaseUrl}/cart/validate/'),
         headers: headers,
         body: json.encode({
           'items': normalizedItems,
@@ -803,11 +775,11 @@ class CartService implements ICartService {
         }),
       ).timeout(const Duration(seconds: 30));
 
-      print('Cart validation response: ${response.statusCode}');
+      if (kDebugMode) print('Cart validation response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         if (_looksLikeHtml(response.body, response.headers)) {
-          print('CartService: HTML response from cart validation');
+          if (kDebugMode) print('CartService: HTML response from cart validation');
           return null;
         }
 
@@ -830,6 +802,8 @@ class CartService implements ICartService {
     }
   }
 
+  /// Calculate delivery fee based on subtotal and location
+  /// FastAPI response format: {success: bool, data: DeliveryFeeResult}
   @override
   Future<DeliveryFeeResult?> calculateDeliveryFee({
     required double subtotal,
@@ -838,7 +812,7 @@ class CartService implements ICartService {
   }) async {
     final token = await _getToken();
     if (token == null) {
-      print('CartService: No token for delivery fee calculation');
+      if (kDebugMode) print('CartService: No token for delivery fee calculation');
       return null;
     }
 
@@ -850,7 +824,7 @@ class CartService implements ICartService {
       if (regionCode != null) queryParams['region_code'] = regionCode;
       if (postalCode != null) queryParams['postal_code'] = postalCode;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/cart/delivery-fee')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/cart/delivery-fee/')
           .replace(queryParameters: queryParams);
 
       final headers = AppConfig.withNgrokBypass({
@@ -866,11 +840,11 @@ class CartService implements ICartService {
         cacheAuthorizedRequests: true,
       );
 
-      print('Delivery fee response: ${response.statusCode}');
+      if (kDebugMode) print('Delivery fee response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         if (_looksLikeHtml(response.body, response.headers)) {
-          print('CartService: HTML response from delivery fee endpoint');
+          if (kDebugMode) print('CartService: HTML response from delivery fee endpoint');
           return null;
         }
 

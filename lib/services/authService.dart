@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../utils/http_cache_client.dart';
 import '../utils/secure_storage.dart';
 import '../config.dart';
+import '../constants/api_paths.dart';
 import '../utils/password_utils.dart';
 import '../utils/input_sanitizer.dart';
 import '../utils/error_handler.dart';
@@ -17,6 +18,8 @@ class AuthService implements IAuthService {
   static const int _maxRetries = 3;
   static const Duration _retryDelay = Duration(seconds: 2);
 
+  String _buildUrl(String path) => '${AppConfig.apiBaseUrl}$path';
+
   @override
   Future<Map<String, dynamic>?> login(String email, String password) async {
     int retryCount = 0;
@@ -27,7 +30,7 @@ class AuthService implements IAuthService {
         final sanitizedPassword = InputSanitizer.sanitizeString(password, maxLength: 128);
 
         final response = await http.post(
-          Uri.parse('${AppConfig.apiBaseUrl}/token/'),
+          Uri.parse(_buildUrl(ApiPaths.login)),
           headers: AppConfig.withNgrokBypass({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -41,12 +44,25 @@ class AuthService implements IAuthService {
         if (response.statusCode == 200) {
           try {
             final jsonBody = json.decode(response.body);
-            final token = jsonBody['access'];
-            final refreshToken = jsonBody['refresh'];
+            // FastAPI returns access_token/refresh_token (not access/refresh)
+            final token = jsonBody['access_token'] ?? jsonBody['access'];
+            final refreshToken = jsonBody['refresh_token'] ?? jsonBody['refresh'];
 
             if (token != null) {
               await _saveToken(token);
               await _saveRefreshToken(refreshToken);
+
+              // Check if user info is in response
+              if (jsonBody['user_id'] != null) {
+                final userInfo = {
+                  'id': jsonBody['user_id'],
+                  'email': jsonBody['email'],
+                  'full_name': jsonBody['full_name'],
+                  'role': jsonBody['role'],
+                };
+                await _saveUser(userInfo);
+                return userInfo;
+              }
 
               final userInfo = await _getUserInfo(token);
               if (userInfo != null) {
@@ -92,7 +108,7 @@ class AuthService implements IAuthService {
         }
 
         final response = await http.post(
-          Uri.parse('${AppConfig.apiBaseUrl}/users/register/'),
+          Uri.parse(_buildUrl(ApiPaths.register)),
           headers: AppConfig.withNgrokBypass({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -104,15 +120,27 @@ class AuthService implements IAuthService {
           }),
         );
 
-        if (response.statusCode == 201) {
+        if (response.statusCode == 201 || response.statusCode == 200) {
           try {
             final jsonBody = json.decode(response.body);
-            final token = jsonBody['access'];
-            final refreshToken = jsonBody['refresh'];
+            final token = jsonBody['access_token'] ?? jsonBody['access'];
+            final refreshToken = jsonBody['refresh_token'] ?? jsonBody['refresh'];
 
             if (token != null) {
               await _saveToken(token);
               await _saveRefreshToken(refreshToken);
+
+              // Check if user info is in response
+              if (jsonBody['user_id'] != null) {
+                final userInfo = {
+                  'id': jsonBody['user_id'],
+                  'email': jsonBody['email'],
+                  'full_name': jsonBody['full_name'],
+                  'role': jsonBody['role'],
+                };
+                await _saveUser(userInfo);
+                return userInfo;
+              }
 
               final userInfo = await _getUserInfo(token);
               if (userInfo != null) {
@@ -136,9 +164,13 @@ class AuthService implements IAuthService {
         } else if (response.statusCode == 400) {
           try {
             final errorBody = json.decode(response.body);
-            final detail = errorBody['detail'] ?? 'Неизвестная ошибка';
+            // FastAPI error format
+            final detail = errorBody['error']?['message'] ??
+                           errorBody['detail'] ??
+                           'Неизвестная ошибка';
             throw Exception(detail);
           } catch (e) {
+            if (e is Exception) rethrow;
             throw Exception('Ошибка валидации данных');
           }
         } else if (response.statusCode == 409) {
@@ -193,7 +225,7 @@ class AuthService implements IAuthService {
       }
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/register/'),
+        Uri.parse(_buildUrl(ApiPaths.register)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -243,7 +275,7 @@ class AuthService implements IAuthService {
       final sanitizedCode = InputSanitizer.sanitizeString(code, maxLength: 6);
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/register-phone-verify/'),
+        Uri.parse(_buildUrl(ApiPaths.phoneVerify)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -255,11 +287,11 @@ class AuthService implements IAuthService {
         final data = json.decode(response.body) as Map<String, dynamic>;
 
         if (data['user'] != null) {
-          if (data['access'] != null) {
-            await _saveToken(data['access']);
+          if (data['access_token'] != null) {
+            await _saveToken(data['access_token']);
           }
-          if (data['refresh'] != null) {
-            await _saveRefreshToken(data['refresh']);
+          if (data['refresh_token'] != null) {
+            await _saveRefreshToken(data['refresh_token']);
           }
           await _saveUser(Map<String, dynamic>.from(data['user'] as Map));
         }
@@ -284,7 +316,7 @@ class AuthService implements IAuthService {
     try {
       final sanitizedPhone = InputSanitizer.sanitizePhone(phone);
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/register-phone-resend/'),
+        Uri.parse(_buildUrl(ApiPaths.phoneResend)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -313,7 +345,7 @@ class AuthService implements IAuthService {
     try {
       final sanitizedPhone = InputSanitizer.sanitizePhone(phone);
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/register-phone-status/'),
+        Uri.parse(_buildUrl(ApiPaths.phoneStatus)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -347,21 +379,21 @@ class AuthService implements IAuthService {
         }
 
         final response = await http.post(
-          Uri.parse('${AppConfig.apiBaseUrl}/token/refresh/'),
+          Uri.parse(_buildUrl(ApiPaths.tokenRefresh)),
           headers: AppConfig.withNgrokBypass({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           }),
-          body: json.encode({'refresh': refreshToken}),
+          body: json.encode({'refresh_token': refreshToken}),
         );
 
         if (response.statusCode == 200) {
           final jsonBody = json.decode(response.body);
-          final newToken = jsonBody['access'];
+          final newToken = jsonBody['access_token'] ?? jsonBody['access'];
 
           if (newToken != null) {
             await _saveToken(newToken);
-            return {'access': newToken};
+            return {'access_token': newToken};
           }
 
           throw Exception('Неверный ответ сервера');
@@ -393,7 +425,7 @@ class AuthService implements IAuthService {
         }
 
         final response = await http.get(
-          Uri.parse('${AppConfig.apiBaseUrl}/users/me/'),
+          Uri.parse(_buildUrl(ApiPaths.userMe)),
           headers: AppConfig.withNgrokBypass({
             'Authorization': 'Bearer $token',
             'Accept': 'application/json',
@@ -423,7 +455,7 @@ class AuthService implements IAuthService {
       final token = await getToken();
       if (token == null) return null;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/users/me/');
+      final uri = Uri.parse(_buildUrl(ApiPaths.userMe));
       final baseHeaders = AppConfig.withNgrokBypass({
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
@@ -481,8 +513,8 @@ class AuthService implements IAuthService {
       if (phone != null) data['phone'] = InputSanitizer.sanitizePhone(phone);
       if (address != null) data['address'] = InputSanitizer.sanitizeAddressLine(address, maxLength: 200);
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/update_profile/'),
+      final response = await http.patch(
+        Uri.parse(_buildUrl(ApiPaths.userMe)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -521,8 +553,8 @@ class AuthService implements IAuthService {
         throw Exception('Username не может быть пустым');
       }
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/update_profile/'),
+      final response = await http.patch(
+        Uri.parse(_buildUrl(ApiPaths.userMe)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -570,7 +602,7 @@ class AuthService implements IAuthService {
       if (validationError != null) return false;
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/change_password/'),
+        Uri.parse(_buildUrl(ApiPaths.changePassword)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -654,7 +686,7 @@ class AuthService implements IAuthService {
       }
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/logout'),
+        Uri.parse(_buildUrl(ApiPaths.logout)),
         headers: AppConfig.withNgrokBypass({
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -699,7 +731,7 @@ class AuthService implements IAuthService {
 
   Future<Map<String, dynamic>?> _getUserInfo(String token) async {
     final response = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/users/me/'),
+      Uri.parse(_buildUrl(ApiPaths.userMe)),
       headers: AppConfig.withNgrokBypass({
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
@@ -735,7 +767,7 @@ class AuthService implements IAuthService {
       if (token == null) return [];
 
       final response = await http.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/addresses/'),
+        Uri.parse(_buildUrl(ApiPaths.userAddresses)),
         headers: AppConfig.withNgrokBypass({
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -749,6 +781,10 @@ class AuthService implements IAuthService {
           final jsonBody = json.decode(response.body);
           if (jsonBody is List) {
             return List<Map<String, dynamic>>.from(jsonBody);
+          }
+          // Handle paginated response
+          if (jsonBody['data'] is List) {
+            return List<Map<String, dynamic>>.from(jsonBody['data']);
           }
           return [];
         } catch (e) {
@@ -789,7 +825,7 @@ class AuthService implements IAuthService {
       }
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/add_address/'),
+        Uri.parse(_buildUrl(ApiPaths.userAddresses)),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -826,7 +862,7 @@ class AuthService implements IAuthService {
       final token = await getToken();
       if (token == null) return null;
 
-      final Map<String, dynamic> data = {'address_id': addressId};
+      final Map<String, dynamic> data = {};
       if (streetAddress != null) data['street_address'] = streetAddress;
       if (apartment != null) data['apartment'] = apartment;
       if (city != null) data['city'] = city;
@@ -834,8 +870,8 @@ class AuthService implements IAuthService {
       if (country != null) data['country'] = country;
       if (isDefault != null) data['is_default'] = isDefault;
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/update_address/'),
+      final response = await http.patch(
+        Uri.parse(_buildUrl(ApiPaths.userAddress(addressId))),
         headers: AppConfig.withNgrokBypass({
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -865,13 +901,11 @@ class AuthService implements IAuthService {
       if (token == null) return false;
 
       final response = await http.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/users/delete_address/'),
+        Uri.parse(_buildUrl(ApiPaths.userAddress(addressId))),
         headers: AppConfig.withNgrokBypass({
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         }),
-        body: json.encode({'address_id': addressId}),
       ).timeout(const Duration(seconds: 30));
 
       return response.statusCode == 200 || response.statusCode == 204;

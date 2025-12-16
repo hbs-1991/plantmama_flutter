@@ -3,7 +3,12 @@ import 'package:styled_divider/styled_divider.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
+import '../utils/app_logger.dart';
 
+/// Widget for changing user's full name.
+///
+/// Aligned with FastAPI backend which uses:
+/// - full_name instead of first_name/last_name
 class ChangeNameWidget extends StatefulWidget {
   const ChangeNameWidget({super.key, this.page});
   final String? page;
@@ -13,8 +18,7 @@ class ChangeNameWidget extends StatefulWidget {
 }
 
 class _ChangeNameWidgetState extends State<ChangeNameWidget> {
-  final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
   bool _isLoading = false;
   User? _currentUser;
 
@@ -30,8 +34,7 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
     if (user != null && mounted) {
       setState(() {
         _currentUser = user;
-        _firstNameController.text = user.firstName;
-        _lastNameController.text = user.lastName;
+        _fullNameController.text = user.fullName;
       });
     }
   }
@@ -39,62 +42,53 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
   Future<void> _saveName() async {
     if (_currentUser == null) return;
 
-    final firstName = _firstNameController.text.trim();
-    final lastName = _lastNameController.text.trim();
+    final fullName = _fullNameController.text.trim();
 
-    if (firstName.isEmpty && lastName.isEmpty) {
+    if (fullName.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Введите хотя бы имя или фамилию')),
+          const SnackBar(content: Text('Please enter your name')),
         );
       }
       return;
     }
 
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      print('ChangeNameWidget: Начинаем обновление профиля...');
-      print('ChangeNameWidget: firstName="$firstName", lastName="$lastName"');
-      
-      // Обновляем firstName и lastName через API
-      final authProvider = context.read<AuthProvider>();
-      print('ChangeNameWidget: Вызываем updateProfile...');
-      
-      final result = await authProvider.updateProfile(
-        firstName: firstName.isNotEmpty ? firstName : null,
-        lastName: lastName.isNotEmpty ? lastName : null,
-      );
+      AppLogger.debug('Updating profile: fullName=$fullName', tag: 'ChangeNameWidget');
 
-      print('ChangeNameWidget: Результат updateProfile: $result');
+      final authProvider = context.read<AuthProvider>();
+      final result = await authProvider.updateProfile(fullName: fullName);
+
+      AppLogger.debug('Update result: $result', tag: 'ChangeNameWidget');
 
       if (result == true) {
         if (mounted) {
-          print('ChangeNameWidget: Профиль успешно обновлен!');
+          AppLogger.info('Profile updated successfully', tag: 'ChangeNameWidget');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Имя и фамилия успешно обновлены'),
+              content: Text('Name updated successfully'),
               backgroundColor: Colors.green,
             ),
           );
           Navigator.pop(context, true);
         }
       } else {
-        print('ChangeNameWidget: updateProfile вернул false');
-        throw Exception('API вернул false - профиль не обновлен');
+        AppLogger.warning('updateProfile returned false', tag: 'ChangeNameWidget');
+        throw Exception('Profile update failed');
       }
     } catch (e) {
-      print('ChangeNameWidget: Исключение при обновлении: $e');
-      print('ChangeNameWidget: Тип исключения: ${e.runtimeType}');
-      
+      AppLogger.error('Profile update error', tag: 'ChangeNameWidget', error: e);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка обновления: ${e.toString().replaceFirst('Exception: ', '')}'),
+            content: Text('Update error: ${e.toString().replaceFirst('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -110,8 +104,7 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
+    _fullNameController.dispose();
     super.dispose();
   }
 
@@ -127,7 +120,7 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
               maxHeight: MediaQuery.of(context).size.height * 0.8,
             ),
             decoration: BoxDecoration(
-              color: Colors.white, // Белый фон для всех секций
+              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Padding(
@@ -150,7 +143,7 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.white, // Белый цвет для всех секций
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Padding(
@@ -161,7 +154,7 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
                               const Padding(
                                 padding: EdgeInsets.only(bottom: 5),
                                 child: Text(
-                                  'First name',
+                                  'Full Name',
                                   style: TextStyle(
                                     color: Color(0xFF8C7070),
                                     fontSize: 13,
@@ -169,62 +162,10 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
                                 ),
                               ),
                               TextFormField(
-                                controller: _firstNameController,
+                                controller: _fullNameController,
                                 decoration: const InputDecoration(
                                   isDense: true,
-                                  hintText: 'TextField',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.all(Radius.circular(20)),
-                                  ),
-                                  filled: true,
-                                  fillColor: Color(0x00FFFFFF),
-                                ),
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  letterSpacing: 0.0,
-                                  height: 1,
-                                ),
-                                textAlign: TextAlign.start,
-                              ),
-                              const SizedBox(height: 8),
-                              const StyledDivider(
-                                thickness: 2,
-                                color: Color(0xFF2F3F24),
-                                lineStyle: DividerLineStyle.dotted,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white, // Белый цвет для всех секций
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 5),
-                                child: Text(
-                                  'Last name (optional)',
-                                  style: TextStyle(
-                                    color: Color(0xFF8C7070),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                              TextFormField(
-                                controller: _lastNameController,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  hintText: 'TextField',
+                                  hintText: 'Enter your full name',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.all(Radius.circular(20)),
                                   ),
@@ -258,7 +199,7 @@ class _ChangeNameWidgetState extends State<ChangeNameWidget> {
                           minimumSize: const Size(60, 60),
                         ),
                         onPressed: _isLoading ? null : _saveName,
-                        child: _isLoading 
+                        child: _isLoading
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,

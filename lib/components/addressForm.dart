@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 import '../models/address.dart';
 import '../utils/app_logger.dart';
 
+/// Address form aligned with FastAPI backend schema.
+///
+/// FastAPI expects:
+/// - full_name: Recipient's full name (required)
+/// - phone: Contact phone for delivery (required)
+/// - address_line1: Primary address line (required)
+/// - address_line2: Secondary address line (optional)
+/// - city: City name (required)
+/// - postal_code: Postal/ZIP code
+/// - country: Country (default: Russia)
+/// - is_default: Set as default address
 class AddressForm extends StatefulWidget {
   final Address? address;
   final Function(Address) onSave;
@@ -18,50 +29,38 @@ class AddressForm extends StatefulWidget {
 
 class _AddressFormState extends State<AddressForm> {
   final _formKey = GlobalKey<FormState>();
-  final _labelController = TextEditingController();
-  final _streetController = TextEditingController();
-  final _apartmentController = TextEditingController();
+  final _fullNameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _countryController = TextEditingController();
   bool _isDefault = false;
-  String _selectedLabel = 'home';
-  bool _isCustomLabel = false;
-  bool _showCustomInput = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.address != null) {
-      _labelController.text = widget.address!.label;
-      _streetController.text = widget.address!.streetAddress;
-      _apartmentController.text = widget.address!.apartment;
+      _fullNameController.text = widget.address!.fullName;
+      _phoneController.text = widget.address!.phone;
+      _addressLine1Controller.text = widget.address!.addressLine1;
+      _addressLine2Controller.text = widget.address!.addressLine2 ?? '';
       _cityController.text = widget.address!.city;
       _postalCodeController.text = widget.address!.postalCode;
       _countryController.text = widget.address!.country;
       _isDefault = widget.address!.isDefault;
-      
-             // Определяем, является ли адрес кастомным
-       if (widget.address!.label != 'home' && widget.address!.label != 'work') {
-         _selectedLabel = 'other';
-         _isCustomLabel = true;
-         _showCustomInput = true;
-         _labelController.text = widget.address!.label;
-       } else {
-         _selectedLabel = widget.address!.label;
-         _isCustomLabel = false;
-         _showCustomInput = false;
-       }
     } else {
-      _countryController.text = 'Turkmenistan';
+      _countryController.text = 'Russia';
     }
   }
 
   @override
   void dispose() {
-    _labelController.dispose();
-    _streetController.dispose();
-    _apartmentController.dispose();
+    _fullNameController.dispose();
+    _phoneController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
     _cityController.dispose();
     _postalCodeController.dispose();
     _countryController.dispose();
@@ -70,21 +69,24 @@ class _AddressFormState extends State<AddressForm> {
 
   void _saveAddress() {
     if (_formKey.currentState!.validate()) {
-      final finalLabel = _isCustomLabel ? _labelController.text.trim() : _selectedLabel;
-
-      AppLogger.debug('Saving address - label: $finalLabel, custom: $_isCustomLabel', tag: 'AddressForm');
+      AppLogger.debug(
+        'Saving address - fullName: ${_fullNameController.text}',
+        tag: 'AddressForm',
+      );
 
       final address = Address(
         id: widget.address?.id ?? 0,
-        label: finalLabel,
-        streetAddress: _streetController.text.trim(),
-        apartment: _apartmentController.text.trim(),
+        fullName: _fullNameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        addressLine1: _addressLine1Controller.text.trim(),
+        addressLine2: _addressLine2Controller.text.trim().isNotEmpty
+            ? _addressLine2Controller.text.trim()
+            : null,
         city: _cityController.text.trim(),
         postalCode: _postalCodeController.text.trim(),
         country: _countryController.text.trim(),
         isDefault: _isDefault,
-        isActive: true,
-        createdAt: widget.address?.createdAt ?? DateTime.now(),
+        createdAt: widget.address?.createdAt,
         updatedAt: DateTime.now(),
       );
       widget.onSave(address);
@@ -95,7 +97,7 @@ class _AddressFormState extends State<AddressForm> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        widget.address == null ? 'Добавить адрес' : 'Редактировать адрес',
+        widget.address == null ? 'Add Address' : 'Edit Address',
         style: const TextStyle(
           color: Color(0xFF8B4513),
           fontSize: 20,
@@ -108,136 +110,115 @@ class _AddressFormState extends State<AddressForm> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                   initialValue: _selectedLabel,
-                   decoration: const InputDecoration(
-                     labelText: 'Тип адреса',
-                     border: OutlineInputBorder(),
-                   ),
-                                       items: const [
-                      DropdownMenuItem(value: 'home', child: Text('Дом')),
-                      DropdownMenuItem(value: 'work', child: Text('Работа')),
-                      DropdownMenuItem(value: 'other', child: Text('Другой')),
-                    ],
-                                       onChanged: (value) {
-                      setState(() {
-                        _selectedLabel = value!;
-                        _isCustomLabel = value == 'other';
-                        _showCustomInput = value == 'other';
-                        if (_isCustomLabel && _labelController.text.isEmpty) {
-                          _labelController.text = '';
-                        }
-                      });
-                    },
-                   validator: (value) {
-                     if (value == null || value.isEmpty) {
-                       return 'Выберите тип адреса';
-                     }
-                     return null;
-                   },
-                                   ),
- 
-               if (_showCustomInput)
-                 Column(
-                   crossAxisAlignment: CrossAxisAlignment.start,
-                   children: [
-                     Row(
-                       children: [
-                         Expanded(
-                           child: TextFormField(
-                             controller: _labelController,
-                             decoration: const InputDecoration(
-                               labelText: 'Название адреса*',
-                               border: OutlineInputBorder(),
-                               hintText: 'Например: Дача, Магазин, Родители',
-                             ),
-                             validator: (value) {
-                               if (value == null || value.trim().isEmpty) {
-                                 return 'Введите название адреса';
-                               }
-                               return null;
-                             },
-                           ),
-                         ),
-                         const SizedBox(width: 8),
-                         IconButton(
-                           onPressed: () {
-                             setState(() {
-                               _showCustomInput = false;
-                               _selectedLabel = 'home';
-                               _isCustomLabel = false;
-                               _labelController.clear();
-                             });
-                           },
-                           icon: const Icon(Icons.close),
-                           tooltip: 'Отменить',
-                         ),
-                       ],
-                     ),
-                     const SizedBox(height: 16),
-                   ],
-                 ),
- 
-               TextFormField(
-                controller: _streetController,
+              // Recipient name (required for FastAPI)
+              TextFormField(
+                controller: _fullNameController,
                 decoration: const InputDecoration(
-                  labelText: 'Улица и номер дома*',
+                  labelText: 'Recipient Name*',
                   border: OutlineInputBorder(),
+                  hintText: 'Full name of the recipient',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Введите адрес';
+                    return 'Please enter recipient name';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
+
+              // Phone (required for FastAPI)
               TextFormField(
-                controller: _apartmentController,
+                controller: _phoneController,
                 decoration: const InputDecoration(
-                  labelText: 'Квартира/Офис',
+                  labelText: 'Phone*',
                   border: OutlineInputBorder(),
+                  hintText: '+7 (XXX) XXX-XX-XX',
+                ),
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter phone number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Address line 1 (required)
+              TextFormField(
+                controller: _addressLine1Controller,
+                decoration: const InputDecoration(
+                  labelText: 'Street Address*',
+                  border: OutlineInputBorder(),
+                  hintText: 'Street name and house number',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter street address';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Address line 2 (optional)
+              TextFormField(
+                controller: _addressLine2Controller,
+                decoration: const InputDecoration(
+                  labelText: 'Apartment/Floor',
+                  border: OutlineInputBorder(),
+                  hintText: 'Apartment, floor, entrance (optional)',
                 ),
               ),
               const SizedBox(height: 16),
+
+              // City (required)
               TextFormField(
                 controller: _cityController,
                 decoration: const InputDecoration(
-                  labelText: 'Город*',
+                  labelText: 'City*',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Введите город';
+                    return 'Please enter city';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
+
+              // Postal code
               TextFormField(
                 controller: _postalCodeController,
                 decoration: const InputDecoration(
-                  labelText: 'Почтовый индекс',
+                  labelText: 'Postal Code',
                   border: OutlineInputBorder(),
                 ),
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
+
+              // Country
               TextFormField(
                 controller: _countryController,
                 decoration: const InputDecoration(
-                  labelText: 'Страна*',
+                  labelText: 'Country*',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Введите страну';
+                    return 'Please enter country';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
+
+              // Default address checkbox
               CheckboxListTile(
-                title: const Text('Адрес по умолчанию'),
+                title: const Text('Set as default address'),
                 value: _isDefault,
                 onChanged: (value) {
                   setState(() {
@@ -253,7 +234,7 @@ class _AddressFormState extends State<AddressForm> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Отмена'),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _saveAddress,
@@ -261,9 +242,9 @@ class _AddressFormState extends State<AddressForm> {
             backgroundColor: const Color(0xFF8B4513),
             foregroundColor: Colors.white,
           ),
-          child: Text(widget.address == null ? 'Добавить' : 'Сохранить'),
+          child: Text(widget.address == null ? 'Add' : 'Save'),
         ),
       ],
     );
   }
-} 
+}

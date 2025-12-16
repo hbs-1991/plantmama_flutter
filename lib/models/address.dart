@@ -1,114 +1,147 @@
-import 'package:flutter/material.dart';
-
+/// Address model aligned with FastAPI backend schema.
+///
+/// API Schema (from api-docs/_common/schemas.yaml):
+/// - full_name: string (required) - Recipient's full name
+/// - phone: string (required) - Contact phone for delivery
+/// - address_line1: string (required) - Primary address line
+/// - address_line2: string (nullable) - Secondary address line
+/// - city: string (required) - City name
+/// - postal_code: string - Postal/ZIP code
+/// - country: string (default: "Russia")
+/// - is_default: boolean
 class Address {
   final int id;
-  final String label;
-  final String streetAddress;
-  final String apartment;
+  final String fullName;
+  final String phone;
+  final String addressLine1;
+  final String? addressLine2;
   final String city;
   final String postalCode;
   final String country;
   final bool isDefault;
-  final bool isActive;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
-  Address({
+  const Address({
     required this.id,
-    required this.label,
-    required this.streetAddress,
-    required this.apartment,
+    required this.fullName,
+    required this.phone,
+    required this.addressLine1,
+    this.addressLine2,
     required this.city,
-    required this.postalCode,
-    required this.country,
-    required this.isDefault,
-    required this.isActive,
-    required this.createdAt,
-    required this.updatedAt,
+    this.postalCode = '',
+    this.country = 'Russia',
+    this.isDefault = false,
+    this.createdAt,
+    this.updatedAt,
   });
 
+  /// Creates Address from FastAPI JSON response.
+  ///
+  /// FastAPI response format:
+  /// ```json
+  /// {
+  ///   "success": true,
+  ///   "data": {
+  ///     "id": 1,
+  ///     "full_name": "John Doe",
+  ///     "phone": "+1234567890",
+  ///     "address_line1": "123 Main St",
+  ///     "address_line2": "Apt 4",
+  ///     "city": "Moscow",
+  ///     "postal_code": "123456",
+  ///     "country": "Russia",
+  ///     "is_default": true,
+  ///     "created_at": "2024-01-01T00:00:00Z",
+  ///     "updated_at": "2024-01-01T00:00:00Z"
+  ///   }
+  /// }
+  /// ```
   factory Address.fromJson(Map<String, dynamic> json) {
-    print('Address.fromJson: Получены данные: $json');
-    try {
-      return Address(
-        id: json['id'] ?? 0,
-        label: json['label'] ?? '',
-        streetAddress: json['street_address'] ?? '',
-        apartment: json['apartment'] ?? '',
-        city: json['city'] ?? '',
-        postalCode: json['postal_code'] ?? '',
-        country: json['country'] ?? '',
-        isDefault: json['is_default'] ?? false,
-        isActive: json['is_active'] ?? true,
-        createdAt: _parseDateTime(json['created_at']),
-        updatedAt: _parseDateTime(json['updated_at']),
-      );
-    } catch (e) {
-      print('Address.fromJson: Ошибка создания объекта: $e');
-      rethrow;
-    }
+    return Address(
+      id: json['id'] ?? 0,
+      fullName: json['full_name'] ?? '',
+      phone: json['phone'] ?? '',
+      addressLine1: json['address_line1'] ?? '',
+      addressLine2: json['address_line2'],
+      city: json['city'] ?? '',
+      postalCode: json['postal_code'] ?? '',
+      country: json['country'] ?? 'Russia',
+      isDefault: json['is_default'] ?? false,
+      createdAt: _parseDateTime(json['created_at']),
+      updatedAt: _parseDateTime(json['updated_at']),
+    );
   }
 
+  /// Converts to JSON for FastAPI requests.
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'label': label,
-      'street_address': streetAddress,
-      'apartment': apartment,
+      if (id != 0) 'id': id,
+      'full_name': fullName,
+      'phone': phone,
+      'address_line1': addressLine1,
+      if (addressLine2 != null && addressLine2!.isNotEmpty)
+        'address_line2': addressLine2,
       'city': city,
       'postal_code': postalCode,
       'country': country,
       'is_default': isDefault,
-      'is_active': isActive,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
     };
   }
 
-  static DateTime _parseDateTime(dynamic dateString) {
-    if (dateString == null) return DateTime.now();
+  static DateTime? _parseDateTime(dynamic dateString) {
+    if (dateString == null) return null;
     try {
       return DateTime.parse(dateString.toString());
     } catch (e) {
-      print('Address._parseDateTime: Ошибка парсинга даты "$dateString": $e');
-      return DateTime.now();
+      return null;
     }
   }
 
-  String get fullAddress {
-    final parts = <String>[];
-    if (streetAddress.isNotEmpty) parts.add(streetAddress);
-    if (apartment.isNotEmpty) parts.add(apartment);
-    if (city.isNotEmpty) parts.add(city);
+  /// Formatted single-line address for display.
+  String get formattedAddress {
+    final parts = <String>[addressLine1];
+    if (addressLine2 != null && addressLine2!.isNotEmpty) {
+      parts.add(addressLine2!);
+    }
+    parts.add(city);
     if (postalCode.isNotEmpty) parts.add(postalCode);
-    return parts.isEmpty ? 'Адрес не указан' : parts.join(', ');
+    return parts.join(', ');
   }
 
-  String get displayLabel {
-    if (label.isEmpty) return 'Адрес';
-    switch (label.toLowerCase()) {
-      case 'home':
-        return 'Дом';
-      case 'work':
-        return 'Работа';
-      case 'other':
-        return 'Другой';
-      default:
-        return label;
-    }
+  /// Full display with recipient info.
+  String get fullDisplay {
+    return '$fullName\n$phone\n$formattedAddress';
   }
 
-  IconData get icon {
-    if (label.isEmpty) return Icons.location_on;
-    switch (label.toLowerCase()) {
-      case 'home':
-        return Icons.home;
-      case 'work':
-        return Icons.work;
-      case 'other':
-        return Icons.location_on;
-      default:
-        return Icons.location_on;
-    }
+  Address copyWith({
+    int? id,
+    String? fullName,
+    String? phone,
+    String? addressLine1,
+    String? addressLine2,
+    String? city,
+    String? postalCode,
+    String? country,
+    bool? isDefault,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Address(
+      id: id ?? this.id,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      addressLine1: addressLine1 ?? this.addressLine1,
+      addressLine2: addressLine2 ?? this.addressLine2,
+      city: city ?? this.city,
+      postalCode: postalCode ?? this.postalCode,
+      country: country ?? this.country,
+      isDefault: isDefault ?? this.isDefault,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
-} 
+
+  @override
+  String toString() => 'Address(id: $id, fullName: $fullName, city: $city)';
+}

@@ -1,20 +1,60 @@
 default_platform(:ios)
 
 platform :ios do
-  desc "Upload to App Store using p8 key"
+  desc "Upload to App Store Connect using API key"
   lane :upload do
+    # Determine key file path dynamically
+    key_id = ENV['APP_STORE_CONNECT_KEY_ID']
+    key_file = "AuthKey_#{key_id}.p8"
+
     api_key = app_store_connect_api_key(
-      key_id: ENV['APP_STORE_CONNECT_KEY_ID'],
+      key_id: key_id,
       issuer_id: ENV['APP_STORE_CONNECT_ISSUER_ID'],
-      key_filepath: "AuthKey_QMN99784M3.p8",  # должен лежать в fastlane/
+      key_filepath: key_file,
       in_house: false
     )
 
+    # Find the IPA file
+    ipa_path = Dir["../build/ios/ipa/*.ipa"].first
+
+    if ipa_path.nil?
+      UI.user_error!("No IPA file found in build/ios/ipa/")
+    end
+
+    UI.message("Uploading IPA: #{ipa_path}")
+
     deliver(
-      ipa: "../build/ios/ipa/plantmana_test.ipa",
+      ipa: ipa_path,
       skip_screenshots: true,
       skip_metadata: true,
-      api_key: api_key
+      skip_app_version_update: true,
+      api_key: api_key,
+      force: true
+    )
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    key_id = ENV['APP_STORE_CONNECT_KEY_ID']
+    key_file = "AuthKey_#{key_id}.p8"
+
+    api_key = app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: ENV['APP_STORE_CONNECT_ISSUER_ID'],
+      key_filepath: key_file,
+      in_house: false
+    )
+
+    ipa_path = Dir["../build/ios/ipa/*.ipa"].first
+
+    if ipa_path.nil?
+      UI.user_error!("No IPA file found in build/ios/ipa/")
+    end
+
+    upload_to_testflight(
+      ipa: ipa_path,
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
     )
   end
 end

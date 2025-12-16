@@ -1,0 +1,942 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Common Schemas
+  description: Shared schemas and components used across all API groups
+  version: 1.0.0
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Bearer token obtained from `/auth/login` or `/auth/register`
+
+        **Usage:**
+        ```
+        Authorization: Bearer {access_token}
+        ```
+
+        **Token Expiration:**
+        - Access tokens expire after 1 hour
+        - Use refresh token to obtain new access token
+        - Refresh tokens expire after 30 days
+
+  schemas:
+    # Authentication Schemas
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - full_name
+        - phone
+      properties:
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+          description: User email address (must be unique)
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+          example: SecurePass123!
+          description: Password (min 8 characters, must contain uppercase, lowercase, numbers)
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: John Doe
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+          example: "+1234567890"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token for API requests
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNTkzNTQwMDAwfQ...
+        refresh_token:
+          type: string
+          description: JWT refresh token for obtaining new access tokens
+        token_type:
+          type: string
+          enum: [bearer]
+          default: bearer
+        user_id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: customer@example.com
+        full_name:
+          type: string
+          example: John Doe
+        role:
+          type: string
+          enum: [customer, staff, admin]
+          default: customer
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Previously obtained refresh token
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+
+    # Product Schemas
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        sku:
+          type: string
+          example: ROSE-001
+          description: Stock keeping unit - unique product identifier
+        name:
+          type: string
+          example: Red Rose Bouquet
+        slug:
+          type: string
+          example: red-rose-bouquet
+          description: URL-friendly product name
+        description:
+          type: string
+          nullable: true
+        short_description:
+          type: string
+          nullable: true
+          example: "12 premium red roses"
+        section_id:
+          type: integer
+          example: 1
+        price:
+          type: string
+          format: decimal
+          example: "2500.00"
+        compare_at_price:
+          type: string
+          format: decimal
+          nullable: true
+          example: "3000.00"
+          description: Original/strikethrough price
+        category_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+        is_featured:
+          type: boolean
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductImage'
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProductImage:
+      type: object
+      properties:
+        id:
+          type: integer
+        image_url:
+          type: string
+          format: uri
+        alt_text:
+          type: string
+          nullable: true
+        is_primary:
+          type: boolean
+        display_order:
+          type: integer
+
+    ProductListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        price:
+          type: string
+          format: decimal
+        compare_at_price:
+          type: string
+          format: decimal
+          nullable: true
+        primary_image:
+          type: string
+          format: uri
+          nullable: true
+        available_quantity:
+          type: integer
+
+    Inventory:
+      type: object
+      properties:
+        id:
+          type: integer
+        quantity:
+          type: integer
+          description: Total quantity in stock
+        reserved_quantity:
+          type: integer
+          description: Quantity reserved for pending orders
+        available_quantity:
+          type: integer
+          description: Quantity available for purchase (quantity - reserved_quantity)
+        low_stock_threshold:
+          type: integer
+        is_low_stock:
+          type: boolean
+        is_out_of_stock:
+          type: boolean
+        track_inventory:
+          type: boolean
+
+    ProductCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        section_id:
+          type: integer
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+          description: ID of parent category (for hierarchical categories)
+        is_active:
+          type: boolean
+        display_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProductSection:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        display_order:
+          type: integer
+        is_active:
+          type: boolean
+
+    # Collection Schemas
+    Collection:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Valentine's Special Bouquet
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        short_description:
+          type: string
+          nullable: true
+        price:
+          type: string
+          format: decimal
+          example: "5000.00"
+        compare_at_price:
+          type: string
+          format: decimal
+          nullable: true
+        section_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+        is_featured:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionItem'
+          description: Products included in this collection
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionImage'
+        inventory:
+          $ref: '#/components/schemas/CollectionInventory'
+        components_total:
+          type: string
+          format: decimal
+          nullable: true
+          description: Total price of individual components
+        discount_from_components:
+          type: string
+          format: decimal
+          nullable: true
+          description: Savings when buying as collection vs individual items
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CollectionItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        quantity:
+          type: integer
+        display_order:
+          type: integer
+        product:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            price:
+              type: string
+              format: decimal
+
+    CollectionImage:
+      type: object
+      properties:
+        id:
+          type: integer
+        image_url:
+          type: string
+          format: uri
+        alt_text:
+          type: string
+          nullable: true
+        is_main:
+          type: boolean
+
+    CollectionInventory:
+      type: object
+      properties:
+        quantity:
+          type: integer
+        reserved_quantity:
+          type: integer
+        available_quantity:
+          type: integer
+        is_low_stock:
+          type: boolean
+        is_out_of_stock:
+          type: boolean
+
+    # Cart Schemas
+    CartItem:
+      type: object
+      required:
+        - product_id
+        - quantity
+      properties:
+        product_id:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+
+    CartValidation:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id:
+                type: integer
+              available:
+                type: boolean
+              quantity_available:
+                type: integer
+              current_price:
+                type: string
+                format: decimal
+        subtotal:
+          type: string
+          format: decimal
+        estimated_delivery_fee:
+          type: string
+          format: decimal
+        all_items_available:
+          type: boolean
+
+    # Order Schemas
+    OrderCreate:
+      type: object
+      required:
+        - payment_method
+        - delivery_method
+        - items
+      properties:
+        payment_method:
+          type: string
+          enum: [card, cash, bank_transfer]
+          description: |
+            - `card` - Credit/debit card
+            - `cash` - Cash on delivery
+            - `bank_transfer` - Bank transfer
+        delivery_method:
+          type: string
+          enum: [delivery, pickup]
+        delivery_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Preferred delivery date/time
+        delivery_time_slot:
+          type: string
+          nullable: true
+          example: "10:00-12:00"
+          description: Preferred delivery time window
+        delivery_address_id:
+          type: integer
+          nullable: true
+          description: ID of saved delivery address
+        new_delivery_address:
+          $ref: '#/components/schemas/AddressCreate'
+          description: New delivery address (if not using saved address)
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              product_id:
+                type: integer
+                nullable: true
+              collection_id:
+                type: integer
+                nullable: true
+              quantity:
+                type: integer
+                minimum: 1
+          description: Must include either product_id or collection_id for each item
+        customer_notes:
+          type: string
+          nullable: true
+          example: "Please ring bell twice"
+        discount_amount:
+          type: string
+          format: decimal
+          nullable: true
+          default: "0.00"
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        order_number:
+          type: string
+          example: ORD-2024-001234
+          description: Unique order reference number
+        customer_id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - payment_confirmed
+            - processing
+            - ready_for_delivery
+            - out_for_delivery
+            - delivered
+            - cancelled
+            - refunded
+          description: Current order status in the fulfillment workflow
+        payment_method:
+          type: string
+          enum: [card, cash, bank_transfer]
+        payment_status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+          nullable: true
+        delivery_method:
+          type: string
+          enum: [delivery, pickup]
+        delivery_address:
+          $ref: '#/components/schemas/Address'
+        delivery_date:
+          type: string
+          format: date-time
+          nullable: true
+        delivery_time_slot:
+          type: string
+          nullable: true
+        subtotal:
+          type: string
+          format: decimal
+          example: "7500.00"
+        delivery_fee:
+          type: string
+          format: decimal
+          example: "300.00"
+        discount_amount:
+          type: string
+          format: decimal
+          example: "100.00"
+        total:
+          type: string
+          format: decimal
+          example: "7700.00"
+        customer_notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+          nullable: true
+        collection_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+        product_sku:
+          type: string
+        unit_price:
+          type: string
+          format: decimal
+        quantity:
+          type: integer
+        subtotal:
+          type: string
+          format: decimal
+        created_at:
+          type: string
+          format: date-time
+
+    # Address Schemas
+    Address:
+      type: object
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        phone:
+          type: string
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+          default: "Russia"
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AddressCreate:
+      type: object
+      required:
+        - full_name
+        - phone
+        - address_line1
+        - city
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        address_line1:
+          type: string
+          minLength: 1
+          maxLength: 255
+        address_line2:
+          type: string
+          nullable: true
+          maxLength: 255
+        city:
+          type: string
+          minLength: 1
+          maxLength: 100
+        postal_code:
+          type: string
+          minLength: 1
+          maxLength: 20
+        country:
+          type: string
+          maxLength: 100
+          default: "Russia"
+        is_default:
+          type: boolean
+          default: false
+
+    # User Schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [customer, staff, admin]
+        is_active:
+          type: boolean
+        is_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # Region Schemas
+    Region:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+          example: TM
+          description: Region code (2 characters, uppercase)
+        name:
+          type: string
+          example: Turkmenistan
+        timezone:
+          type: string
+          example: Asia/Ashgabat
+          description: IANA timezone for region
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # Error Schemas
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: NOT_FOUND
+              description: Machine-readable error code
+            message:
+              type: string
+              example: Product not found
+              description: Human-readable error message
+            details:
+              type: object
+              nullable: true
+              description: Additional error context
+
+    ValidationError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_ERROR]
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+                  value:
+                    type: string
+
+    # Response Wrappers
+    SuccessResponse_ProductResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/ProductResponse'
+
+    SuccessResponse_ProductCategory:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/ProductCategory'
+
+    SuccessResponse_ProductSection:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/ProductSection'
+
+    SuccessResponse_Collection:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/Collection'
+
+    SuccessResponse_CartValidation:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/CartValidation'
+
+    SuccessResponse_Order:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/Order'
+
+    SuccessResponse_User:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/User'
+
+    # Pagination Schemas
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    PaginatedProductResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductListItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedCategoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCategory'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedSectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSection'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedCollectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Collection'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedOrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Operation completed successfully"

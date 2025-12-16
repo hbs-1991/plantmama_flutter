@@ -28,7 +28,7 @@ class RegionService implements IRegionService {
         queryParams['is_active'] = isActive.toString();
       }
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/regions').replace(
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/regions/').replace(
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
       );
 
@@ -81,7 +81,7 @@ class RegionService implements IRegionService {
   @override
   Future<Region?> getCurrentRegion({String? regionCode}) async {
     try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/regions/current');
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/regions/current/');
 
       final headers = AppConfig.withNgrokBypass({
         'Accept': 'application/json',

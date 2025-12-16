@@ -1,0 +1,227 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Authentication
+  description: |
+    User registration, login, and token management endpoints.
+
+    ## Authentication Flow
+    1. Register new account via `/auth/register` or login via `/auth/login`
+    2. Receive access_token and refresh_token
+    3. Use access_token in Authorization header for protected endpoints
+    4. When access_token expires, use refresh_token to get new tokens
+    5. Logout to invalidate session
+
+    ## Token Expiration
+    - Access token: 1 hour
+    - Refresh token: 30 days
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new customer account
+      description: |
+        Creates a new user account and associated customer profile.
+        Returns access and refresh tokens for immediate login.
+
+        **Note:** Newly registered users can immediately start shopping.
+        Phone number verification happens asynchronously.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../_common/schemas.yaml#/components/schemas/RegisterRequest'
+            examples:
+              success:
+                summary: Valid registration
+                value:
+                  email: customer@example.com
+                  password: SecurePass123!
+                  full_name: John Doe
+                  phone: "+1234567890"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/LoginResponse'
+              examples:
+                success:
+                  summary: Registration successful
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    token_type: bearer
+                    user_id: 1
+                    email: customer@example.com
+                    full_name: John Doe
+                    role: customer
+        '400':
+          description: Invalid input or email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+              examples:
+                emailExists:
+                  summary: Email already registered
+                  value:
+                    success: false
+                    error:
+                      code: EMAIL_ALREADY_EXISTS
+                      message: Email already registered
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ValidationError'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      description: |
+        Authenticate user and obtain access/refresh tokens.
+
+        **Token Expiration:**
+        - Access token: 1 hour
+        - Refresh token: 30 days
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../_common/schemas.yaml#/components/schemas/LoginRequest'
+            examples:
+              success:
+                summary: Valid login
+                value:
+                  email: customer@example.com
+                  password: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Use a valid refresh token to obtain a new access token.
+        Useful when your access token expires.
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../_common/schemas.yaml#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/RefreshTokenResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change user password
+      description: Update the current user's password
+      operationId: changePassword
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../_common/schemas.yaml#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/MessageResponse'
+        '401':
+          description: Invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: |
+        Invalidate the current user session.
+        Clear tokens on the client side after receiving this response.
+      operationId: logoutUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Authentication
+    description: User registration, login, and token management

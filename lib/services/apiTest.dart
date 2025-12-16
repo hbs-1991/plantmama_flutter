@@ -6,12 +6,13 @@ import '../models/product.dart';
 import '../models/section.dart';
 import '../models/category.dart';
 import '../config.dart';
+import '../constants/api_paths.dart';
 import './interfaces/i_product_api_service.dart';
 
 class ProductApiService implements IProductApiService {
-  static final String _baseUrl = '${AppConfig.apiBaseUrl}/products/';
-  static final String _sectionsUrl = '${AppConfig.apiBaseUrl}/products/sections/';
-  static final String _categoriesUrl = '${AppConfig.apiBaseUrl}/products/categories/';
+  static String get _baseUrl => '${AppConfig.apiBaseUrl}${ApiPaths.products}';
+  static String get _sectionsUrl => '${AppConfig.apiBaseUrl}${ApiPaths.productSections}';
+  static String get _categoriesUrl => '${AppConfig.apiBaseUrl}${ApiPaths.productCategories}';
 
   Map<String, String> _headers() {
     return AppConfig.withNgrokBypass({
@@ -138,22 +139,64 @@ class ProductApiService implements IProductApiService {
     }
   }
 
+  /// Builds query parameters, excluding null values
+  Map<String, String> _buildQueryParams(Map<String, dynamic> params) {
+    final result = <String, String>{};
+    params.forEach((key, value) {
+      if (value != null) {
+        result[key] = value.toString();
+      }
+    });
+    return result;
+  }
+
   @override
-  Future<List<Product>> getProducts() async {
+  Future<List<Product>> getProducts({
+    int skip = 0,
+    int limit = 100,
+    String? search,
+    int? sectionId,
+    int? categoryId,
+    bool? isFeatured,
+    bool? inStock,
+    double? minPrice,
+    double? maxPrice,
+    String? regionCode,
+  }) async {
     List<Product> allProducts = [];
-    String? nextUrl = _baseUrl;
+    int currentSkip = skip;
+    const maxPages = 10;
     int pageCount = 0;
-    const maxPages = 10; // Ограничиваем количество страниц
-    
+
     print('API - Начинаем загрузку продуктов с URL: $_baseUrl');
-    
-    while (nextUrl != null && pageCount < maxPages) {
+
+    while (pageCount < maxPages) {
       try {
-        print('API - Загружаем страницу продуктов $pageCount: $nextUrl');
-        http.Response response = await _get(nextUrl, ttlSeconds: 600, enableCache: true);
-        
-        print('API RESPONSE for $nextUrl: Status ${response.statusCode}');
-        
+        final queryParams = _buildQueryParams({
+          'skip': currentSkip,
+          'limit': limit,
+          'search': search,
+          'section_id': sectionId,
+          'category_id': categoryId,
+          'is_featured': isFeatured,
+          'in_stock': inStock,
+          'min_price': minPrice,
+          'max_price': maxPrice,
+        });
+        final uri = Uri.parse(_baseUrl).replace(queryParameters: queryParams);
+        final url = uri.toString();
+        print('API - Загружаем страницу продуктов $pageCount: $url');
+
+        // Add region header if provided
+        Map<String, String> headers = _headers();
+        if (regionCode != null) {
+          headers['X-Region-Code'] = regionCode;
+        }
+
+        http.Response response = await _get(url, ttlSeconds: 600, enableCache: true);
+
+        print('API RESPONSE for $url: Status ${response.statusCode}');
+
         if (response.statusCode == 200) {
           // Проверяем Content-Type - если это JSON, то не проверяем на HTML
           final contentType = response.headers['content-type'] ?? '';
@@ -164,7 +207,7 @@ class ProductApiService implements IProductApiService {
             // Пробуем с принудительным ngrok bypass
             if (pageCount == 0 && AppConfig.enableNgrokBypass) {
               print('API - Пробуем с принудительным ngrok bypass');
-              response = await _get(nextUrl, forceNgrokBypass: true, ttlSeconds: 600, enableCache: false);
+              response = await _get(url, forceNgrokBypass: true, ttlSeconds: 600, enableCache: false);
               if (_looksLikeHtml(response.body, response.headers)) {
                 print('API - HTML получен даже с bypass, прерываем');
                 break;
@@ -173,36 +216,42 @@ class ProductApiService implements IProductApiService {
               break;
             }
           }
-          
+
           try {
             final jsonBody = json.decode(response.body);
             print('API - JSON успешно распарсен для продуктов: ${jsonBody.runtimeType}');
-            
-            if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
+
+            // FastAPI format: {success: true, data: [...], meta: {...}}
+            if (jsonBody is Map<String, dynamic> && jsonBody['data'] is List) {
               final products = List<Product>.from(
-                jsonBody['results'].map((product) => Product.fromJson(product))
+                (jsonBody['data'] as List).map((product) => Product.fromJson(product))
               );
               allProducts.addAll(products);
               print('API - Добавлено ${products.length} продуктов с текущей страницы');
-              
-              // Проверяем следующую страницу
-              nextUrl = jsonBody['next'];
-              if (nextUrl != null) {
-                nextUrl = nextUrl.replaceFirst('http://', 'https://');
-                print('API - Следующая страница продуктов: $nextUrl');
+
+              // Check pagination from meta
+              final meta = jsonBody['meta'];
+              if (meta != null) {
+                final totalPages = meta['total_pages'] ?? 1;
+                final currentPage = meta['page'] ?? 1;
+                print('API - Страница $currentPage из $totalPages');
+
+                if (currentPage >= totalPages || products.isEmpty) {
+                  print('API - Достигнута последняя страница');
+                  break;
+                }
+              } else if (products.isEmpty) {
+                break;
               }
+
+              currentSkip += limit;
               pageCount++;
-            } else if (jsonBody is List) {
-              // Если API возвращает список напрямую
-              final products = List<Product>.from(
-                jsonBody.map((product) => Product.fromJson(product))
-              );
-              allProducts.addAll(products);
-              print('API - Добавлено ${products.length} продуктов (прямой список)');
-              break; // Нет пагинации для прямого списка
             } else {
               print('API - Неожиданная структура ответа для продуктов: ${jsonBody.runtimeType}');
               print('API - Ключи: ${jsonBody is Map ? jsonBody.keys.toList() : 'не Map'}');
+              if (jsonBody is Map) {
+                print('API - Содержимое: $jsonBody');
+              }
               break;
             }
           } catch (e) {
@@ -223,15 +272,24 @@ class ProductApiService implements IProductApiService {
         break;
       }
     }
-    
+
     print('API - Всего загружено продуктов: ${allProducts.length}');
+
+    // Debug: Print first few products to verify section_slug
+    if (allProducts.isNotEmpty) {
+      print('API - Примеры продуктов:');
+      for (var p in allProducts.take(3)) {
+        print('  - ${p.name}: section_slug="${p.sectionSlug}", section_name="${p.sectionName}"');
+      }
+    }
+
     return allProducts;
   }
 
   @override
   Future<Product?> getProductById(int id) async {
     try {
-      final url = '${AppConfig.apiBaseUrl}/products/$id/';
+      final url = '${AppConfig.apiBaseUrl}${ApiPaths.product(id)}';
       print('API - Загружаем продукт с ID $id по URL: $url');
       
       http.Response response = await _get(url, ttlSeconds: 1800, enableCache: true);
@@ -292,12 +350,33 @@ class ProductApiService implements IProductApiService {
   }
 
   @override
-  Future<List<Section>> getSections() async {
+  Future<List<Section>> getSections({
+    int skip = 0,
+    int limit = 50,
+    bool? isActive,
+    String? regionCode,
+  }) async {
     try {
-      print('API - Загружаем секции с URL: $_sectionsUrl');
-      http.Response response = await _get(_sectionsUrl, ttlSeconds: 3600, enableCache: true);
+      final queryParams = _buildQueryParams({
+        'skip': skip,
+        'limit': limit,
+        'is_active': isActive,
+      });
+      final uri = Uri.parse(_sectionsUrl).replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+      final url = uri.toString();
+      print('API - Загружаем секции с URL: $url');
+
+      // Add region header if provided
+      Map<String, String> headers = _headers();
+      if (regionCode != null) {
+        headers['X-Region-Code'] = regionCode;
+      }
+
+      http.Response response = await _get(url, ttlSeconds: 3600, enableCache: true);
       print('API RESPONSE sections: Status ${response.statusCode}');
-      
+
       if (response.statusCode == 200) {
         // Проверяем Content-Type - если это JSON, то не проверяем на HTML
         final contentType = response.headers['content-type'] ?? '';
@@ -318,29 +397,28 @@ class ProductApiService implements IProductApiService {
             return [];
           }
         }
-        
+
         try {
           final jsonBody = json.decode(response.body);
           print('API - JSON успешно распарсен для секций: ${jsonBody.runtimeType}');
-          
-          if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
+
+          // FastAPI format: {success: true, data: [...], meta: {...}}
+          if (jsonBody is Map<String, dynamic> && jsonBody['data'] is List) {
             final sections = List<Section>.from(
-              jsonBody['results'].map((section) => Section.fromJson(section))
+              (jsonBody['data'] as List).map((section) => Section.fromJson(section))
             );
             sections.sort((a, b) => a.order.compareTo(b.order));
             print('API - Успешно загружено ${sections.length} секций');
-            return sections;
-          } else if (jsonBody is List) {
-            // Если API возвращает список напрямую
-            final sections = List<Section>.from(
-              jsonBody.map((section) => Section.fromJson(section))
-            );
-            sections.sort((a, b) => a.order.compareTo(b.order));
-            print('API - Успешно загружено ${sections.length} секций (прямой список)');
+            for (var s in sections) {
+              print('  - Section: ${s.name}, slug: "${s.slug}", id: ${s.id}');
+            }
             return sections;
           } else {
             print('API - Неожиданная структура ответа для секций: ${jsonBody.runtimeType}');
             print('API - Ключи: ${jsonBody is Map ? jsonBody.keys.toList() : 'не Map'}');
+            if (jsonBody is Map) {
+              print('API - Содержимое: $jsonBody');
+            }
             return [];
           }
         } catch (e) {
@@ -363,20 +441,43 @@ class ProductApiService implements IProductApiService {
   }
 
   @override
-  Future<List<Category>> getCategories() async {
+  Future<List<Category>> getCategories({
+    int skip = 0,
+    int limit = 50,
+    int? sectionId,
+    int? parentId,
+    bool? isActive,
+    String? regionCode,
+  }) async {
     List<Category> allCategories = [];
-    String? nextUrl = _categoriesUrl;
+    int currentSkip = skip;
+    const maxPages = 5;
     int pageCount = 0;
-    const maxPages = 5; // Ограничиваем количество страниц
-    
+
     print('API - Начинаем загрузку категорий с URL: $_categoriesUrl');
-    
-    while (nextUrl != null && pageCount < maxPages) {
+
+    while (pageCount < maxPages) {
       try {
-        print('API - Загружаем страницу категорий $pageCount: $nextUrl');
-        http.Response response = await _get(nextUrl, ttlSeconds: 3600, enableCache: true);
-        print('API RESPONSE categories for $nextUrl: Status ${response.statusCode}');
-        
+        final queryParams = _buildQueryParams({
+          'skip': currentSkip,
+          'limit': limit,
+          'section_id': sectionId,
+          'parent_id': parentId,
+          'is_active': isActive,
+        });
+        final uri = Uri.parse(_categoriesUrl).replace(queryParameters: queryParams);
+        final url = uri.toString();
+        print('API - Загружаем страницу категорий $pageCount: $url');
+
+        // Add region header if provided
+        Map<String, String> headers = _headers();
+        if (regionCode != null) {
+          headers['X-Region-Code'] = regionCode;
+        }
+
+        http.Response response = await _get(url, ttlSeconds: 3600, enableCache: true);
+        print('API RESPONSE categories for $url: Status ${response.statusCode}');
+
         if (response.statusCode == 200) {
           // Проверяем Content-Type - если это JSON, то не проверяем на HTML
           final contentType = response.headers['content-type'] ?? '';
@@ -387,7 +488,7 @@ class ProductApiService implements IProductApiService {
             // Пробуем с принудительным ngrok bypass
             if (pageCount == 0 && AppConfig.enableNgrokBypass) {
               print('API - Применяем ngrok bypass для категорий');
-              response = await _get(nextUrl, forceNgrokBypass: true, ttlSeconds: 3600, enableCache: false);
+              response = await _get(url, forceNgrokBypass: true, ttlSeconds: 3600, enableCache: false);
               if (_looksLikeHtml(response.body, response.headers)) {
                 print('API - HTML получен даже с bypass, прерываем загрузку');
                 break;
@@ -397,36 +498,41 @@ class ProductApiService implements IProductApiService {
               break;
             }
           }
-          
+
           try {
             final jsonBody = json.decode(response.body);
             print('API - JSON успешно распарсен для категорий: ${jsonBody.runtimeType}');
-            
-            if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
+
+            // FastAPI format: {success: true, data: [...], meta: {...}}
+            if (jsonBody is Map<String, dynamic> && jsonBody['data'] is List) {
               final categories = List<Category>.from(
-                jsonBody['results'].map((category) => Category.fromJson(category))
+                (jsonBody['data'] as List).map((category) => Category.fromJson(category))
               );
               allCategories.addAll(categories);
               print('API - Добавлено ${categories.length} категорий с текущей страницы');
-              
-              // Проверяем следующую страницу
-              nextUrl = jsonBody['next'];
-              if (nextUrl != null) {
-                nextUrl = nextUrl.replaceFirst('http://', 'https://');
-                print('API - Следующая страница категорий: $nextUrl');
+
+              // Check pagination from meta
+              final meta = jsonBody['meta'];
+              if (meta != null) {
+                final totalPages = meta['total_pages'] ?? 1;
+                final currentPage = meta['page'] ?? 1;
+                print('API - Страница $currentPage из $totalPages');
+
+                if (currentPage >= totalPages || categories.isEmpty) {
+                  break;
+                }
+              } else if (categories.isEmpty) {
+                break;
               }
+
+              currentSkip += limit;
               pageCount++;
-            } else if (jsonBody is List) {
-              // Если API возвращает список напрямую
-              final categories = List<Category>.from(
-                jsonBody.map((category) => Category.fromJson(category))
-              );
-              allCategories.addAll(categories);
-              print('API - Добавлено ${categories.length} категорий (прямой список)');
-              break; // Нет пагинации для прямого списка
             } else {
               print('API - Неожиданная структура ответа для категорий: ${jsonBody.runtimeType}');
               print('API - Ключи: ${jsonBody is Map ? jsonBody.keys.toList() : 'не Map'}');
+              if (jsonBody is Map) {
+                print('API - Содержимое: $jsonBody');
+              }
               break;
             }
           } catch (e) {
@@ -447,40 +553,10 @@ class ProductApiService implements IProductApiService {
         break;
       }
     }
-    
+
     allCategories.sort((a, b) => a.order.compareTo(b.order));
     print('API - Всего загружено категорий: ${allCategories.length}');
-    print('API - Парсинг категорий: ${allCategories.map((c) => '${c.name} (ID: ${c.id}, ${c.sectionSlug})').toList()}');
+    print('API - Парсинг категорий: ${allCategories.map((c) => '${c.name} (ID: ${c.id}, sectionSlug: ${c.sectionSlug})').toList()}');
     return allCategories;
-  }
-
-  // Fallback данные для категорий
-  List<Category> _getFallbackCategories() {
-    return [
-      Category(
-        id: 1,
-        name: 'Bouquets',
-        slug: 'bouquets',
-        sectionName: 'Flowers',
-        sectionSlug: 'flowers',
-        order: 1,
-      ),
-      Category(
-        id: 2,
-        name: 'Indoor Plants',
-        slug: 'indoor-plants',
-        sectionName: 'Plants',
-        sectionSlug: 'plants',
-        order: 2,
-      ),
-      Category(
-        id: 3,
-        name: 'Coffee',
-        slug: 'coffee',
-        sectionName: 'Cafe',
-        sectionSlug: 'cafe',
-        order: 3,
-      ),
-    ];
   }
 }

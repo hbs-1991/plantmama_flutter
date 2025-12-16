@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../models/collection.dart';
 import '../config.dart';
+import '../constants/api_paths.dart';
 import '../utils/error_handler.dart';
 import '../utils/error_reporter.dart';
 import '../utils/http_cache_client.dart';
@@ -52,7 +53,7 @@ class CollectionService implements ICollectionService {
         queryParams['max_price'] = maxPrice.toString();
       }
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/collections')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}${ApiPaths.collections}/')
           .replace(queryParameters: queryParams);
 
       final headers = AppConfig.withNgrokBypass({
@@ -108,7 +109,7 @@ class CollectionService implements ICollectionService {
   }) async {
     try {
       final uri =
-          Uri.parse('${AppConfig.apiBaseUrl}/collections/$collectionId');
+          Uri.parse('${AppConfig.apiBaseUrl}${ApiPaths.collections}/$collectionId/');
 
       final headers = AppConfig.withNgrokBypass({
         'Accept': 'application/json',

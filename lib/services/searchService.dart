@@ -28,7 +28,7 @@ class SearchService implements ISearchService {
         'limit': limit.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/search')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/search/')
           .replace(queryParameters: queryParams);
 
       final headers = AppConfig.withNgrokBypass({

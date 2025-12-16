@@ -1,0 +1,105 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Categories
+  description: |
+    Product categories and hierarchy endpoints.
+
+    ## Category Structure
+    Categories can be hierarchical (with parent categories).
+    Use parent_id to filter subcategories of a specific category.
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /products/categories:
+    get:
+      tags:
+        - Categories
+      summary: List product categories
+      description: |
+        Get all product categories with optional filtering.
+        Categories can be hierarchical (with parent categories).
+      operationId: listCategories
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: section_id
+          in: query
+          description: Filter by section ID
+          schema:
+            type: integer
+        - name: parent_id
+          in: query
+          description: Filter by parent category ID (for subcategories)
+          schema:
+            type: integer
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+        - name: X-Region-Code
+          in: header
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Categories retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/PaginatedCategoryResponse'
+
+  /products/categories/{category_id}:
+    get:
+      tags:
+        - Categories
+      summary: Get category details
+      description: Retrieve details of a specific category
+      operationId: getCategory
+      parameters:
+        - name: category_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Region-Code
+          in: header
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_ProductCategory'
+        '404':
+          description: Category not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Categories
+    description: Product categories and hierarchy

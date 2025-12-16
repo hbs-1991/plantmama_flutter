@@ -1,49 +1,114 @@
-name: iOS Release
+name: iOS Build & Release
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  upload-ios:
-    name: Upload iOS App
+  build:
+    name: Build iOS App
     runs-on: macos-latest
 
     steps:
-    # 1️⃣ Забираем код
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # 2️⃣ Декодируем API-ключ и сохраняем в файл .p8
-    - name: Prepare App Store Connect API key
-      run: |
-        mkdir -p fastlane
-        echo "${{ secrets.APP_STORE_CONNECT_API_KEY_FILE_BASE64 }}" | base64 --decode > fastlane/AuthKey_QMN99784M3.p8
-        cat fastlane/AuthKey_QMN99784M3.p8  # Для отладки: убедитесь, что файл не пустой
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
 
-    # 3️⃣ Устанавливаем Fastlane
-    - name: Install fastlane
-      run: sudo gem install fastlane
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
-    # 4️⃣ Проверяем, существует ли IPA файл
-    - name: Check if IPA exists
-      run: |
-        ls ./build/ios/ipa/
-        if [ ! -f ./build/ios/ipa/plantmana_test.ipa ]; then
-          echo "IPA file does not exist!"
-          exit 1
-        fi
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install --repo-update
 
-    # 5️⃣ Загружаем IPA на App Store Connect
-    - name: Upload IPA to App Store Connect
-      run: |
-        fastlane deliver --ipa ./build/ios/ipa/plantmana_test.ipa --skip_binary_upload true
-      env:
-        APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        FASTLANE_SKIP_UPDATE_CHECK: 1
-        # Убираем переменные с логином и паролем
-        # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}  # Удалить
-        # APPLE_USERNAME: ${{ secrets.APPLE_USERNAME }}  # Удалить
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload iOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 30
+
+  # Separate job for App Store deployment - only runs on main branch push
+  deploy:
+    name: Deploy to App Store
+    runs-on: macos-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install --repo-update
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Install Fastlane
+        run: gem install fastlane
+
+      - name: Install Apple Certificate
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERT_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERT_PASSWORD }}
+
+      - name: Install Provisioning Profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Prepare App Store Connect API key
+        run: |
+          mkdir -p fastlane
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_FILE_BASE64 }}" | base64 --decode > fastlane/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Build IPA
+        run: |
+          flutter build ipa --release --export-options-plist=ios/exportOptions.plist
+
+      - name: Upload to App Store Connect
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          cd fastlane
+          fastlane upload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ipa
+          path: build/ios/ipa/*.ipa
+          retention-days: 30

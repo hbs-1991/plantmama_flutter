@@ -196,7 +196,41 @@ class ProductsProvider extends ChangeNotifier {
 
   List<app_models.Category> categoriesForSection(String? sectionSlug) {
     if (sectionSlug == null || sectionSlug.isEmpty) return _allCategories;
-    final list = _allCategories.where((c) => c.sectionSlug == sectionSlug).toList();
+
+    // First, try to find the section by slug to get its ID
+    Section? targetSection;
+    if (_sections.isNotEmpty) {
+      targetSection = _sections.cast<Section?>().firstWhere(
+        (s) => s!.slug == sectionSlug || s.slug == _getFallbackSlug(sectionSlug),
+        orElse: () => null,
+      );
+    }
+
+    List<app_models.Category> list;
+    if (targetSection != null) {
+      // Filter by section_id (preferred) or section_slug
+      list = _allCategories.where((c) {
+        if (c.sectionId != null && c.sectionId == targetSection!.id) {
+          return true;
+        }
+        if (c.sectionSlug == targetSection!.slug) {
+          return true;
+        }
+        if (c.sectionSlug == targetSection!.id.toString()) {
+          return true;
+        }
+        return false;
+      }).toList();
+    } else {
+      // Fallback to slug matching
+      final fallbackSlug = _getFallbackSlug(sectionSlug);
+      list = _allCategories.where((c) =>
+        c.sectionSlug == sectionSlug ||
+        c.sectionSlug == fallbackSlug ||
+        c.sectionSlug.toLowerCase() == sectionSlug.toLowerCase()
+      ).toList();
+    }
+
     // Если передан неизвестный slug (например, 'catalog') — показываем все
     return list.isEmpty ? _allCategories : list;
   }
@@ -204,23 +238,59 @@ class ProductsProvider extends ChangeNotifier {
   List<Product> productsForSection(String? sectionSlug) {
     if (sectionSlug == null || sectionSlug.isEmpty) return _allProducts;
 
-    // If sections are not loaded yet, use fallback mapping
-    if (_sections.isEmpty) {
-      print('ProductsProvider: Sections not loaded yet, using fallback mapping');
-      final fallbackSlug = _getFallbackSlug(sectionSlug);
-      final filtered = _allProducts.where((p) => p.sectionSlug == fallbackSlug).toList();
-      print('ProductsProvider: productsForSection("$sectionSlug") -> fallback slug "$fallbackSlug", found ${filtered.length} products');
+    print('ProductsProvider: productsForSection("$sectionSlug")');
+    print('ProductsProvider: Total products available: ${_allProducts.length}');
+
+    // First, try to find the section by slug to get its ID
+    Section? targetSection;
+    if (_sections.isNotEmpty) {
+      targetSection = _sections.cast<Section?>().firstWhere(
+        (s) => s!.slug == sectionSlug || s.slug == _getFallbackSlug(sectionSlug),
+        orElse: () => null,
+      );
+    }
+
+    if (targetSection != null) {
+      print('ProductsProvider: Found target section: ${targetSection.name} (id=${targetSection.id}, slug=${targetSection.slug})');
+
+      // Filter by section_id (preferred) or section_slug
+      final filtered = _allProducts.where((p) {
+        // Try matching by section_id first (most reliable)
+        if (p.sectionId != null && p.sectionId == targetSection!.id) {
+          return true;
+        }
+        // Fallback to slug matching
+        if (p.sectionSlug == targetSection!.slug) {
+          return true;
+        }
+        // Also check if product.sectionSlug is the section_id as string
+        if (p.sectionSlug == targetSection!.id.toString()) {
+          return true;
+        }
+        return false;
+      }).toList();
+
+      print('ProductsProvider: Filtered ${filtered.length} products for section ${targetSection.name}');
+      if (filtered.isEmpty && _allProducts.isNotEmpty) {
+        print('ProductsProvider: DEBUG - Sample products:');
+        for (var p in _allProducts.take(3)) {
+          print('  - ${p.name}: sectionId=${p.sectionId}, sectionSlug="${p.sectionSlug}"');
+        }
+      }
       return filtered;
     }
 
-    // Получаем правильный slug для фильтрации
-    final correctSlug = _getCorrectSectionSlug(sectionSlug);
-    final filtered = _allProducts.where((p) => p.sectionSlug == correctSlug).toList();
+    // Fallback: try direct slug matching with various mappings
+    final fallbackSlug = _getFallbackSlug(sectionSlug);
+    print('ProductsProvider: No section found, using fallback slug: $fallbackSlug');
 
-    print('ProductsProvider: productsForSection("$sectionSlug") -> using slug "$correctSlug"');
-    print('ProductsProvider: returned ${filtered.length} products');
-    print('ProductsProvider: Available products: ${_allProducts.map((p) => '${p.name} (${p.sectionSlug})').toList()}');
+    final filtered = _allProducts.where((p) {
+      return p.sectionSlug == sectionSlug ||
+             p.sectionSlug == fallbackSlug ||
+             p.sectionSlug.toLowerCase() == sectionSlug.toLowerCase();
+    }).toList();
 
+    print('ProductsProvider: Fallback filtering returned ${filtered.length} products');
     return filtered;
   }
 

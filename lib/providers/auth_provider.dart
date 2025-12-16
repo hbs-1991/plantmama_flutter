@@ -1,19 +1,25 @@
 import 'package:flutter/foundation.dart';
 import '../services/interfaces/i_auth_service.dart';
 import '../di/locator.dart';
-import '../models/user.dart'; // Added import for User model
+import '../models/user.dart';
+import '../utils/app_logger.dart';
 
+/// Authentication provider for managing user state.
+///
+/// Aligned with FastAPI backend which uses:
+/// - full_name instead of first_name/last_name
+/// - access_token/refresh_token instead of access/refresh
 class AuthProvider extends ChangeNotifier {
   final IAuthService _authService = locator.get<IAuthService>();
   bool _isChecking = true;
   bool _isLoading = false;
-  User? _currentUser; // Изменяем тип на User?
+  User? _currentUser;
   bool _isLoggedIn = false;
 
   bool get isChecking => _isChecking;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _isLoggedIn;
-  User? get currentUser => _currentUser; // Изменяем тип возвращаемого значения
+  User? get currentUser => _currentUser;
 
   Future<void> initialize() async {
     _isChecking = true;
@@ -24,25 +30,24 @@ class AuthProvider extends ChangeNotifier {
         final savedUser = await _authService.getSavedUser();
         if (savedUser != null) {
           _currentUser = User.fromJson(savedUser);
-          print('AuthProvider: initialize() - пользователь загружен из сохраненных данных');
+          AppLogger.debug('User loaded from saved data', tag: 'AuthProvider');
         } else {
-          print('AuthProvider: initialize() - сохраненные данные не найдены, пытаемся получить с сервера');
+          AppLogger.debug('No saved data, fetching from server', tag: 'AuthProvider');
           final currentUser = await _authService.getCurrentUser();
           if (currentUser != null) {
             _currentUser = User.fromJson(currentUser);
-            print('AuthProvider: initialize() - пользователь получен с сервера');
+            AppLogger.debug('User fetched from server', tag: 'AuthProvider');
           } else {
-            print('AuthProvider: initialize() - не удалось получить данные пользователя, сбрасываем авторизацию');
+            AppLogger.debug('Failed to get user data, logging out', tag: 'AuthProvider');
             _isLoggedIn = false;
             await _authService.logout();
           }
         }
       } else {
-        print('AuthProvider: initialize() - пользователь не авторизован');
+        AppLogger.debug('User not authenticated', tag: 'AuthProvider');
       }
     } catch (e) {
-      print('AuthProvider: initialize() - ошибка инициализации: $e');
-      // При ошибке сбрасываем состояние авторизации
+      AppLogger.error('Initialization error', tag: 'AuthProvider', error: e);
       _isLoggedIn = false;
       _currentUser = null;
     } finally {
@@ -51,29 +56,38 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(String email, String password) async {
     _isLoading = true;
     notifyListeners();
     try {
-      print('AuthProvider: login() - начинаем вход для $username');
-      final result = await _authService.login(username, password);
+      AppLogger.debug('Starting login for $email', tag: 'AuthProvider');
+      final result = await _authService.login(email, password);
       if (result != null) {
-        print('AuthProvider: login() - вход успешен, результат: $result');
+        AppLogger.debug('Login successful', tag: 'AuthProvider');
         _isLoggedIn = true;
+
+        // FastAPI returns user data in various formats
         if (result['user'] != null) {
           _currentUser = User.fromJson(result['user']);
-          print('AuthProvider: login() - пользователь создан из результата');
         } else {
+          // Try to get user from saved data or construct from response
           final savedUser = await _authService.getSavedUser();
           if (savedUser != null) {
             _currentUser = User.fromJson(savedUser);
-            print('AuthProvider: login() - пользователь загружен из сохраненных данных');
+          } else {
+            // Construct User from login response (FastAPI format)
+            _currentUser = User(
+              id: result['user_id'] ?? result['id'] ?? 0,
+              email: result['email'] ?? email,
+              fullName: result['full_name'] ?? '',
+              phone: result['phone'] ?? '',
+              role: UserRole.fromString(result['role']),
+            );
           }
         }
-        print('AuthProvider: login() - вход завершен, isLoggedIn: $_isLoggedIn');
         return true;
       }
-      print('AuthProvider: login() - вход не удался, результат null');
+      AppLogger.debug('Login failed - null result', tag: 'AuthProvider');
       return false;
     } finally {
       _isLoading = false;
@@ -83,7 +97,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> register(String email, String phone, String password) async {
     if (_isLoading) {
-      print('AuthProvider: Регистрация уже выполняется, пропускаем');
+      AppLogger.debug('Registration already in progress', tag: 'AuthProvider');
       return false;
     }
 
@@ -91,54 +105,45 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('AuthProvider: Начинаем регистрацию для $email');
+      AppLogger.debug('Starting registration for $email', tag: 'AuthProvider');
       final result = await _authService.register(email, phone, password);
 
       if (result != null) {
-        print('AuthProvider: Регистрация успешна');
+        AppLogger.info('Registration successful', tag: 'AuthProvider');
 
-        // Проверяем, есть ли токены в результате
-        final hasTokens = result.containsKey('access') || result.containsKey('token');
+        // Check for tokens in FastAPI response format
+        final hasTokens = result.containsKey('access_token') ||
+                          result.containsKey('access') ||
+                          result.containsKey('token');
 
         if (hasTokens) {
-          // Если токены есть, устанавливаем пользователя как авторизованного
           _currentUser = User(
-            id: result['id'] ?? 0,
-            username: result['username'] ?? '',
+            id: result['user_id'] ?? result['id'] ?? 0,
             email: result['email'] ?? email,
-            firstName: result['first_name'] ?? '',
-            lastName: result['last_name'] ?? '',
+            fullName: result['full_name'] ?? '',
             phone: result['phone'] ?? phone,
-            address: result['address'] ?? '',
-            dateJoined: result['date_joined'] ?? DateTime.now().toIso8601String(),
-            token: result['access'] ?? result['token'],
+            role: UserRole.fromString(result['role']),
           );
           _isLoggedIn = true;
-          print('AuthProvider: Пользователь авторизован после регистрации');
+          AppLogger.info('User authenticated after registration', tag: 'AuthProvider');
         } else {
-          // Если токенов нет, создаем пользователя без авторизации
           _currentUser = User(
-            id: result['id'] ?? 0,
-            username: result['username'] ?? '',
+            id: result['user_id'] ?? result['id'] ?? 0,
             email: result['email'] ?? email,
-            firstName: result['first_name'] ?? '',
-            lastName: result['last_name'] ?? '',
+            fullName: result['full_name'] ?? '',
             phone: result['phone'] ?? phone,
-            address: result['address'] ?? '',
-            dateJoined: result['date_joined'] ?? DateTime.now().toIso8601String(),
-            token: null,
           );
           _isLoggedIn = false;
-          print('AuthProvider: Регистрация успешна, но требуется вход для получения токенов');
+          AppLogger.info('Registration success, login required', tag: 'AuthProvider');
         }
 
         return true;
       } else {
-        print('AuthProvider: Регистрация не удалась - нет результата');
+        AppLogger.debug('Registration failed - no result', tag: 'AuthProvider');
         return false;
       }
     } catch (e) {
-      print('AuthProvider: Ошибка регистрации: $e');
+      AppLogger.error('Registration error', tag: 'AuthProvider', error: e);
       return false;
     } finally {
       _isLoading = false;
@@ -153,97 +158,57 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Update user profile.
+  ///
+  /// FastAPI expects: full_name, phone (no separate first/last name)
   Future<bool> updateProfile({
-    String? firstName,
-    String? lastName,
+    String? fullName,
     String? phone,
-    String? address,
   }) async {
     try {
-      print('AuthProvider: updateProfile - начинаем обновление: firstName=$firstName, lastName=$lastName');
-      
+      AppLogger.debug('Updating profile: fullName=$fullName', tag: 'AuthProvider');
+
+      // Map to the auth service which still uses firstName/lastName internally
+      // but the API now expects full_name
       final result = await _authService.updateProfile(
-        firstName: firstName,
-        lastName: lastName,
+        firstName: fullName,  // Service internally sends as full_name
         phone: phone,
-        address: address,
       );
 
-      print('AuthProvider: updateProfile - получен результат: $result');
-
       if (result != null) {
-        // Обновляем локальные данные пользователя
         if (_currentUser != null) {
-          print('AuthProvider: updateProfile - обновляем локальные данные');
-          print('AuthProvider: updateProfile - старые данные: firstName=${_currentUser!.firstName}, lastName=${_currentUser!.lastName}');
-          
-          _currentUser = User(
-            id: _currentUser!.id,
-            username: _currentUser!.username,
-            email: _currentUser!.email,
-            firstName: result['first_name'] ?? _currentUser!.firstName,
-            lastName: result['last_name'] ?? _currentUser!.lastName,
+          _currentUser = _currentUser!.copyWith(
+            fullName: result['full_name'] ?? _currentUser!.fullName,
             phone: result['phone'] ?? _currentUser!.phone,
-            address: result['address'] ?? _currentUser!.address,
-            dateJoined: _currentUser!.dateJoined,
-            token: _currentUser!.token,
           );
-          
-          print('AuthProvider: updateProfile - новые данные: firstName=${_currentUser!.firstName}, lastName=${_currentUser!.lastName}');
+          AppLogger.debug('Profile updated: fullName=${_currentUser!.fullName}', tag: 'AuthProvider');
         }
         notifyListeners();
         return true;
       }
       return false;
     } catch (e) {
-      print('AuthProvider: Ошибка обновления профиля: $e');
+      AppLogger.error('Profile update error', tag: 'AuthProvider', error: e);
       return false;
     }
   }
 
-  Future<bool> updateUsername(String username) async {
-    try {
-      final result = await _authService.updateUsername(username);
-
-      if (result != null) {
-        // Обновляем локальные данные пользователя
-        if (_currentUser != null) {
-          _currentUser = User(
-            id: _currentUser!.id,
-            username: username,
-            email: _currentUser!.email,
-            firstName: _currentUser!.firstName,
-            lastName: _currentUser!.lastName,
-            phone: _currentUser!.phone,
-            address: _currentUser!.address,
-            dateJoined: _currentUser!.dateJoined,
-            token: _currentUser!.token,
-          );
-        }
-        notifyListeners();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('AuthProvider: Ошибка обновления username: $e');
-      return false;
-    }
-  }
-
-  // Address management methods
+  // Address management methods - delegate to auth service
   Future<List<Map<String, dynamic>>> getUserAddresses() async {
     try {
       return await _authService.getUserAddresses();
     } catch (e) {
-      print('AuthProvider: Ошибка получения адресов: $e');
+      AppLogger.error('Error getting addresses', tag: 'AuthProvider', error: e);
       return [];
     }
   }
 
+  /// Add address using FastAPI schema fields.
   Future<bool> addAddress({
-    required String label,
-    required String streetAddress,
-    String? apartment,
+    required String fullName,
+    required String phone,
+    required String addressLine1,
+    String? addressLine2,
     required String city,
     required String postalCode,
     required String country,
@@ -251,9 +216,9 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     try {
       final result = await _authService.addAddress(
-        label: label,
-        streetAddress: streetAddress,
-        apartment: apartment,
+        label: fullName,  // Map fullName to label for service compatibility
+        streetAddress: addressLine1,
+        apartment: addressLine2,
         city: city,
         postalCode: postalCode,
         country: country,
@@ -261,21 +226,22 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (result != null) {
-        // Обновляем локальные данные пользователя
         await _refreshUserData();
         return true;
       }
       return false;
     } catch (e) {
-      print('AuthProvider: Ошибка добавления адреса: $e');
+      AppLogger.error('Error adding address', tag: 'AuthProvider', error: e);
       return false;
     }
   }
 
   Future<bool> updateAddress({
     required int addressId,
-    String? streetAddress,
-    String? apartment,
+    String? fullName,
+    String? phone,
+    String? addressLine1,
+    String? addressLine2,
     String? city,
     String? postalCode,
     String? country,
@@ -284,8 +250,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       final result = await _authService.updateAddress(
         addressId: addressId,
-        streetAddress: streetAddress,
-        apartment: apartment,
+        streetAddress: addressLine1,
+        apartment: addressLine2,
         city: city,
         postalCode: postalCode,
         country: country,
@@ -293,13 +259,12 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (result != null) {
-        // Обновляем локальные данные пользователя
         await _refreshUserData();
         return true;
       }
       return false;
     } catch (e) {
-      print('AuthProvider: Ошибка обновления адреса: $e');
+      AppLogger.error('Error updating address', tag: 'AuthProvider', error: e);
       return false;
     }
   }
@@ -308,13 +273,12 @@ class AuthProvider extends ChangeNotifier {
     try {
       final result = await _authService.deleteAddress(addressId);
       if (result) {
-        // Обновляем локальные данные пользователя
         await _refreshUserData();
         return true;
       }
       return false;
     } catch (e) {
-      print('AuthProvider: Ошибка удаления адреса: $e');
+      AppLogger.error('Error deleting address', tag: 'AuthProvider', error: e);
       return false;
     }
   }
@@ -327,9 +291,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('AuthProvider: Ошибка обновления данных пользователя: $e');
+      AppLogger.error('Error refreshing user data', tag: 'AuthProvider', error: e);
     }
   }
 }
-
-

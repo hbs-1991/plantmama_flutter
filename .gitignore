@@ -45,3 +45,30 @@ app.*.map.json
 
 #project-docs
 project-docs/
+
+# Sensitive files - NEVER commit these
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+*.jks
+*.keystore
+
+# iOS signing
+ios/*.mobileprovision
+ios/*.p12
+*.mobileprovision
+*.p12
+
+# Fastlane sensitive files
+fastlane/AuthKey*.p8
+fastlane/api_key.json
+fastlane/report.xml
+fastlane/README.md
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Local configuration
+*.local

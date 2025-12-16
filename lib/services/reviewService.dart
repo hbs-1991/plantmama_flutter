@@ -50,15 +50,20 @@ class ReviewApiService implements IReviewService {
       if (response.statusCode == 200) {
         try {
           final jsonBody = json.decode(response.body);
-          final results = jsonBody['results'] as List<dynamic>? ?? [];
-          return results.map((json) => Review.fromJson(json)).toList();
+          // FastAPI uses { "success": true, "data": [...] } format
+          // Fall back to "results" for backward compatibility
+          final data = jsonBody['data'] ?? jsonBody['results'] ?? jsonBody;
+          if (data is List) {
+            return data.map((json) => Review.fromJson(json)).toList();
+          }
+          return [];
         } catch (e) {
-          print('ReviewService: Ошибка парсинга JSON отзывов: $e');
-          return []; // Возвращаем пустой список вместо ошибки
+          print('ReviewService: Error parsing reviews JSON: $e');
+          return [];
         }
       } else {
-        print('ReviewService: Ошибка сервера: ${response.statusCode}');
-        return []; // Возвращаем пустой список вместо ошибки
+        print('ReviewService: Server error: ${response.statusCode}');
+        return [];
       }
     } catch (e) {
       print('ReviewService: Ошибка при получении отзывов: $e');
@@ -220,19 +225,23 @@ class ReviewApiService implements IReviewService {
       if (response.statusCode == 200) {
         try {
           final jsonBody = json.decode(response.body);
-          final results = jsonBody['results'] as List<dynamic>? ?? [];
-          return results.map((json) => Review.fromJson(json)).toList();
+          // FastAPI uses { "success": true, "data": [...] } format
+          final data = jsonBody['data'] ?? jsonBody['results'] ?? jsonBody;
+          if (data is List) {
+            return data.map((json) => Review.fromJson(json)).toList();
+          }
+          return [];
         } catch (e) {
-          print('ReviewService: Ошибка парсинга JSON всех отзывов: $e');
-          return []; // Возвращаем пустой список вместо ошибки
+          print('ReviewService: Error parsing all reviews JSON: $e');
+          return [];
         }
       } else {
-        print('ReviewService: Ошибка сервера: ${response.statusCode}');
-        return []; // Возвращаем пустой список вместо ошибки
+        print('ReviewService: Server error: ${response.statusCode}');
+        return [];
       }
     } catch (e) {
-      print('ReviewService: Ошибка при получении всех отзывов: $e');
-      return []; // Возвращаем пустой список вместо ошибки
+      print('ReviewService: Error getting all reviews: $e');
+      return [];
     }
   }
 

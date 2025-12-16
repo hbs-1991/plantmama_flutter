@@ -1,0 +1,241 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Products
+  description: |
+    Product catalog, search, and details endpoints.
+
+    ## Features
+    - Full-text search across name and description
+    - Filter by section, category, active status
+    - Price range filtering
+    - Stock status filtering
+    - Sorting support
+    - Region-specific pricing via X-Region-Code header
+
+    ## Pagination
+    - Default: 20 items per page
+    - Maximum: 100 items per page
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products with filtering and pagination
+      description: |
+        Retrieve paginated list of products with advanced filtering options.
+
+        **Features:**
+        - Full-text search across name and description
+        - Filter by section, category, active status
+        - Price range filtering
+        - Stock status filtering
+        - Sorting support
+
+        **Pagination:**
+        - Default: 20 items per page
+        - Maximum: 100 items per page
+      operationId: listProducts
+      parameters:
+        - name: skip
+          in: query
+          description: Number of items to skip (for pagination)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          description: Number of items to return per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: search
+          in: query
+          description: Search term for product name/description
+          schema:
+            type: string
+          examples:
+            example1:
+              value: "rose"
+              description: Search for roses
+        - name: section_id
+          in: query
+          description: Filter by product section ID
+          schema:
+            type: integer
+          examples:
+            example1:
+              value: 1
+              description: Get products from section 1
+        - name: category_id
+          in: query
+          description: Filter by product category ID
+          schema:
+            type: integer
+        - name: is_featured
+          in: query
+          description: Filter featured products only
+          schema:
+            type: boolean
+        - name: in_stock
+          in: query
+          description: Filter only products in stock
+          schema:
+            type: boolean
+        - name: min_price
+          in: query
+          description: Minimum product price
+          schema:
+            type: number
+            format: decimal
+        - name: max_price
+          in: query
+          description: Maximum product price
+          schema:
+            type: number
+            format: decimal
+        - name: X-Region-Code
+          in: header
+          description: Region code for region-specific data (e.g., TM, AE)
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/PaginatedProductResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+
+  /products/{product_id}:
+    get:
+      tags:
+        - Products
+      summary: Get product details
+      description: |
+        Retrieve detailed information about a specific product including:
+        - Product metadata (name, description, pricing)
+        - Images and media
+        - Inventory and stock status
+        - Category and section information
+      operationId: getProduct
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: integer
+            example: 1
+        - name: X-Region-Code
+          in: header
+          description: Region code for region-specific data
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Product details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_ProductResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      id: 1
+                      sku: ROSE-001
+                      name: Red Rose Bouquet
+                      slug: red-rose-bouquet
+                      description: A beautiful arrangement of 12 red roses
+                      short_description: 12 premium red roses
+                      section_id: 1
+                      price: "2500.00"
+                      compare_at_price: "3000.00"
+                      category_id: 5
+                      is_active: true
+                      is_featured: true
+                      images:
+                        - id: 1
+                          image_url: https://images.plantmama.com/rose-1.jpg
+                          alt_text: Red rose bouquet
+                          is_primary: true
+                          display_order: 0
+                      inventory:
+                        id: 1
+                        quantity: 100
+                        reserved_quantity: 45
+                        available_quantity: 55
+                        low_stock_threshold: 10
+                        is_low_stock: false
+                        is_out_of_stock: false
+                      created_at: "2024-01-01T00:00:00Z"
+                      updated_at: "2024-01-05T10:30:00Z"
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+
+  /products/{product_id}/images:
+    get:
+      tags:
+        - Products
+      summary: Get product images
+      description: Retrieve all images for a specific product
+      operationId: getProductImages
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Product images retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '../_common/schemas.yaml#/components/schemas/ProductImage'
+        '404':
+          description: Product not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Products
+    description: Product catalog, search, and details

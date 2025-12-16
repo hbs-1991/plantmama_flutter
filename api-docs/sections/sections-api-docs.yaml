@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Sections
+  description: |
+    Product sections (top-level categories) endpoints.
+
+    ## Sections
+    Sections are the top-level organization of products.
+    Examples: Flowers, Plants, Gifts, etc.
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /product-sections:
+    get:
+      tags:
+        - Sections
+      summary: List product sections
+      description: |
+        Get all product sections (top-level categories).
+        Examples: Flowers, Plants, Gifts, etc.
+      operationId: listSections
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+        - name: X-Region-Code
+          in: header
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Sections retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/PaginatedSectionResponse'
+
+  /product-sections/{section_id}:
+    get:
+      tags:
+        - Sections
+      summary: Get section details
+      description: Retrieve details of a specific section
+      operationId: getSection
+      parameters:
+        - name: section_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Region-Code
+          in: header
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Section details
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_ProductSection'
+        '404':
+          description: Section not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Sections
+    description: Product sections (top-level categories)

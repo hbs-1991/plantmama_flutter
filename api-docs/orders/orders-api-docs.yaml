@@ -1,0 +1,266 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Orders
+  description: |
+    Order creation, tracking, and management endpoints.
+
+    ## Order Workflow
+    1. Create order with items and delivery address
+    2. System validates stock and pricing
+    3. Order placed with PENDING status
+    4. Process payment based on payment_method
+    5. Order transitions to PAYMENT_CONFIRMED
+
+    ## Order Statuses
+    - `pending` - Order created, awaiting payment
+    - `payment_confirmed` - Payment received
+    - `processing` - Order being prepared
+    - `ready_for_delivery` - Ready for shipping/pickup
+    - `out_for_delivery` - In transit
+    - `delivered` - Successfully delivered
+    - `cancelled` - Order cancelled
+    - `refunded` - Payment refunded
+
+    ## Payment Methods
+    - `card` - Credit/debit card (requires payment processing)
+    - `cash` - Cash on delivery
+    - `bank_transfer` - Bank transfer (manual verification)
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: Get user's orders
+      description: |
+        Retrieve paginated list of orders for the authenticated user.
+
+        **Includes:**
+        - Order summary with totals
+        - Order status and payment status
+        - Delivery information
+      operationId: listUserOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          description: Filter by order status
+          schema:
+            type: string
+            enum:
+              - pending
+              - payment_confirmed
+              - processing
+              - ready_for_delivery
+              - out_for_delivery
+              - delivered
+              - cancelled
+              - refunded
+        - name: payment_method
+          in: query
+          schema:
+            type: string
+            enum: [card, cash, bank_transfer]
+        - name: delivery_method
+          in: query
+          schema:
+            type: string
+            enum: [delivery, pickup]
+      responses:
+        '200':
+          description: Orders retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/PaginatedOrderResponse'
+        '401':
+          description: Unauthorized
+
+    post:
+      tags:
+        - Orders
+      summary: Create new order
+      description: |
+        Place a new order with items and delivery details.
+
+        **Order Workflow:**
+        1. Create order with items and delivery address
+        2. System validates stock and pricing
+        3. Order placed with PENDING status
+        4. Process payment based on payment_method
+        5. Order transitions to PAYMENT_CONFIRMED
+
+        **Payment Methods:**
+        - `card` - Credit/debit card (requires payment processing)
+        - `cash` - Cash on delivery
+        - `bank_transfer` - Bank transfer (manual verification)
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../_common/schemas.yaml#/components/schemas/OrderCreate'
+            examples:
+              cashOnDelivery:
+                summary: Cash on delivery order
+                value:
+                  payment_method: cash
+                  delivery_method: delivery
+                  delivery_date: "2024-01-15T10:00:00Z"
+                  delivery_time_slot: "10:00-12:00"
+                  delivery_address_id: 1
+                  items:
+                    - product_id: 1
+                      quantity: 2
+                    - collection_id: 5
+                      quantity: 1
+                  customer_notes: Please ring bell twice
+                  discount_amount: 100
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_Order'
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      id: 42
+                      order_number: ORD-2024-001234
+                      customer_id: 1
+                      status: pending
+                      payment_method: cash
+                      payment_status: pending
+                      delivery_method: delivery
+                      subtotal: "7500.00"
+                      delivery_fee: "300.00"
+                      discount_amount: "100.00"
+                      total: "7700.00"
+                      created_at: "2024-01-05T10:30:00Z"
+        '400':
+          description: |
+            Order creation failed. Common reasons:
+            - Items out of stock
+            - Invalid delivery address
+            - Delivery date in the past
+            - Invalid payment method for region
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+
+  /orders/{order_id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order details
+      description: |
+        Retrieve complete details of a specific order including:
+        - Order items with unit prices
+        - Delivery address
+        - Payment and shipping status
+        - Order timeline
+      operationId: getOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Order details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_Order'
+        '404':
+          description: Order not found
+        '403':
+          description: |
+            You don't have permission to view this order
+            (trying to access another user's order)
+
+  /orders/{order_id}/cancel:
+    post:
+      tags:
+        - Orders
+      summary: Cancel an order
+      description: |
+        Cancel an order if it hasn't been shipped yet.
+
+        **Cancellation Policy:**
+        - Can cancel if status is `pending` or `payment_confirmed`
+        - Cannot cancel if already in `processing` or later status
+        - Refunds processed within 5-7 business days
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for cancellation
+      responses:
+        '200':
+          description: Order cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/MessageResponse'
+        '400':
+          description: Order cannot be cancelled at this status
+        '404':
+          description: Order not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Orders
+    description: Order creation, tracking, and management

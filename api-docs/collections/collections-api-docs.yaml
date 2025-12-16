@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Collections
+  description: |
+    Curated product collections and bundles endpoints.
+
+    ## Collections
+    Collections are ready-made arrangements of multiple products
+    bundled together at a special price (bouquets, gift sets, themed arrangements).
+
+    Each collection includes:
+    - Items with quantities
+    - Total collection price vs component prices
+    - Discount savings information
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /collections:
+    get:
+      tags:
+        - Collections
+      summary: List collections
+      description: |
+        Get curated collections (bouquets, gift sets, themed arrangements).
+
+        **Collections** are ready-made arrangements of multiple products
+        bundled together at a special price.
+      operationId: listCollections
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          description: Search collection name
+          schema:
+            type: string
+        - name: section_id
+          in: query
+          schema:
+            type: integer
+        - name: is_featured
+          in: query
+          schema:
+            type: boolean
+        - name: in_stock
+          in: query
+          schema:
+            type: boolean
+        - name: min_price
+          in: query
+          schema:
+            type: number
+            format: decimal
+        - name: max_price
+          in: query
+          schema:
+            type: number
+            format: decimal
+        - name: X-Region-Code
+          in: header
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Collections retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/PaginatedCollectionResponse'
+
+  /collections/{collection_id}:
+    get:
+      tags:
+        - Collections
+      summary: Get collection details
+      description: |
+        Retrieve detailed information about a specific collection including:
+        - Items in the collection with quantities
+        - Total collection price vs component prices
+        - Discount savings information
+      operationId: getCollection
+      parameters:
+        - name: collection_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Region-Code
+          in: header
+          schema:
+            type: string
+            default: TM
+      responses:
+        '200':
+          description: Collection details
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_Collection'
+        '404':
+          description: Collection not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Collections
+    description: Curated product collections and bundles

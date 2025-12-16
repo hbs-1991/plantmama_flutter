@@ -454,11 +454,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                               child: CircularProgressIndicator(strokeWidth: 2)
                                             )
                                           : Text(
-                                              isUserAuthenticated 
-                                                  ? '${_currentUser?.firstName ?? ''} ${_currentUser?.lastName ?? ''}'.trim().isEmpty 
-                                                      ? _currentUser?.email ?? 'Гость'
-                                                      : '${_currentUser?.firstName ?? ''} ${_currentUser?.lastName ?? ''}'.trim()
-                                                  : 'Гость',
+                                              isUserAuthenticated
+                                                  ? _currentUser?.displayName ?? _currentUser?.email ?? 'Guest'
+                                                  : 'Guest',
                                               style: TextStyle(color: widget.page == 'plants' ? const Color(0xFF4CAF50) : const Color(0xFF8B3A3A), fontSize: 20)
                                             ),
                                       Text(

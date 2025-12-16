@@ -3,9 +3,12 @@ import '../models/address.dart';
 import 'package:provider/provider.dart';
 import '../providers/addresses_provider.dart';
 import '../components/addressForm.dart';
-import '../test_address_api.dart';
-import 'test_page.dart';
+import '../utils/app_logger.dart';
 
+/// Address list page aligned with FastAPI backend.
+///
+/// Displays addresses with recipient info (full_name, phone)
+/// instead of labels (home/work).
 class AddressListPage extends StatefulWidget {
   const AddressListPage({super.key});
 
@@ -29,20 +32,20 @@ class _AddressListPageState extends State<AddressListPage> {
 
   Future<void> _loadAddresses() async {
     try {
-      print('AddressListPage: Начинаем загрузку адресов');
+      AppLogger.debug('Loading addresses...', tag: 'AddressListPage');
       setState(() {
         _isLoading = true;
         _error = null;
       });
-      
+
       final loadedAddresses = context.read<AddressesProvider>().addresses;
-      print('AddressListPage: Получено адресов: ${loadedAddresses.length}');
+      AppLogger.debug('Loaded ${loadedAddresses.length} addresses', tag: 'AddressListPage');
       setState(() {
         addresses = loadedAddresses;
         _isLoading = false;
       });
     } catch (e) {
-      print('AddressListPage: Ошибка загрузки: $e');
+      AppLogger.error('Error loading addresses', tag: 'AddressListPage', error: e);
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -56,7 +59,7 @@ class _AddressListPageState extends State<AddressListPage> {
       backgroundColor: const Color(0xFFFFF5F5),
       appBar: AppBar(
         title: const Text(
-          'Мои адреса',
+          'My Addresses',
           style: TextStyle(
             color: Color(0xFF8B4513),
             fontSize: 20,
@@ -66,23 +69,10 @@ class _AddressListPageState extends State<AddressListPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF8B4513)),
-            onPressed: () => Navigator.pop(context),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF8B4513)),
+          onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.bug_report, color: Color(0xFF8B4513)),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TestPage()),
-              ),
-            ),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -99,7 +89,7 @@ class _AddressListPageState extends State<AddressListPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Ошибка загрузки адресов',
+                              'Error loading addresses',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.red[700],
@@ -107,7 +97,7 @@ class _AddressListPageState extends State<AddressListPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _error ?? 'Неизвестная ошибка',
+                              _error ?? 'Unknown error',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.red,
@@ -115,29 +105,13 @@ class _AddressListPageState extends State<AddressListPage> {
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
-                            Builder(
-                              builder: (context) => ElevatedButton(
-                                onPressed: _loadAddresses,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8B4513),
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Повторить'),
+                            ElevatedButton(
+                              onPressed: _loadAddresses,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B4513),
+                                foregroundColor: Colors.white,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Builder(
-                              builder: (context) => ElevatedButton(
-                                                onPressed: () async {
-                                  final test = AddressApiTest();
-                                  await test.testAddressApi();
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Тест API'),
-                              ),
+                              child: const Text('Retry'),
                             ),
                           ],
                         ),
@@ -145,7 +119,7 @@ class _AddressListPageState extends State<AddressListPage> {
                     : addresses.isEmpty
                         ? const Center(
                             child: Text(
-                              'У вас пока нет сохраненных адресов',
+                              'No saved addresses yet',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Color(0xFF666666),
@@ -157,171 +131,29 @@ class _AddressListPageState extends State<AddressListPage> {
                             itemCount: addresses.length,
                             itemBuilder: (context, index) {
                               final address = addresses[index];
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF0F5),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.grey.withValues(alpha: 0.1),
-                                      spreadRadius: 1,
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      address.displayLabel,
-                                                      style: const TextStyle(
-                                                        fontSize: 18,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: Color(0xFF4A4A4A),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    if (address.isDefault)
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 4,
-                                                        ),
-                                                        decoration: BoxDecoration(
-                                                          color: const Color(0xFF4CAF50),
-                                                          borderRadius: BorderRadius.circular(12),
-                                                        ),
-                                                        child: const Text(
-                                                          'По умолчанию',
-                                                          style: TextStyle(
-                                                            color: Colors.white,
-                                                            fontSize: 12,
-                                                            fontWeight: FontWeight.w500,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  address.fullAddress,
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    color: Color(0xFF666666),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Container(
-                                            width: 60,
-                                            height: 60,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE8F5E8),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Icon(
-                                              address.icon,
-                                              color: const Color(0xFF4CAF50),
-                                              size: 30,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Builder(
-                                        builder: (context) => Row(
-                                          children: [
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                 onPressed: () {
-                                                  _editAddress(address);
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF8B4513),
-                                                  foregroundColor: Colors.white,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                                ),
-                                                child: const Text(
-                                                  'Редактировать',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                 onPressed: () {
-                                                  _deleteAddress(address);
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF8B4513),
-                                                  foregroundColor: Colors.white,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                                ),
-                                                child: const Text(
-                                                  'Удалить',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+                              return _buildAddressCard(address);
                             },
                           ),
           ),
           Container(
             padding: const EdgeInsets.all(16),
-            child: Builder(
-              builder: (context) => SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _addNewAddress();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B4513),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _addNewAddress,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8B4513),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'Добавить новый адрес',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'Add New Address',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -329,46 +161,151 @@ class _AddressListPageState extends State<AddressListPage> {
           ),
         ],
       ),
-      bottomNavigationBar: Builder(
-        builder: (context) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFF0F5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey,
-                blurRadius: 4,
-                offset: Offset(0, -2),
-              ),
-            ],
+    );
+  }
+
+  Widget _buildAddressCard(Address address) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF0F5),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          child: BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: const Color(0xFFFFF0F5),
-            selectedItemColor: const Color(0xFF8B4513),
-            unselectedItemColor: const Color(0xFF8B4513),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Каталог',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.favorite),
-                label: 'Избранное',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_cart),
-                label: 'Корзина',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Профиль',
-              ),
-            ],
-            currentIndex: 3,
-            onTap: (index) {
-              _onBottomNavTap(index);
-            },
-          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Recipient name with default badge
+                      Row(
+                        children: [
+                          Text(
+                            address.fullName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4A4A4A),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (address.isDefault)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4CAF50),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'Default',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // Phone number
+                      Text(
+                        address.phone,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Formatted address
+                      Text(
+                        address.formattedAddress,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E8),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Color(0xFF4CAF50),
+                    size: 30,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _editAddress(address),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B4513),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      'Edit',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _deleteAddress(address),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B4513),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -377,31 +314,31 @@ class _AddressListPageState extends State<AddressListPage> {
   void _editAddress(Address address) {
     showDialog(
       context: context,
-      builder: (context) => AddressForm(
+      builder: (dialogContext) => AddressForm(
         address: address,
         onSave: (updatedAddress) async {
           try {
-            print('AddressListPage: Обновляем адрес');
-            print('AddressListPage: ID: ${updatedAddress.id}');
-            print('AddressListPage: Label: ${updatedAddress.label}');
-            print('AddressListPage: Street: ${updatedAddress.streetAddress}');
-            
+            AppLogger.debug('Updating address: ${updatedAddress.id}', tag: 'AddressListPage');
             await context.read<AddressesProvider>().updateAddress(updatedAddress);
-            Navigator.pop(context);
+            Navigator.pop(dialogContext);
             _loadAddresses();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Адрес обновлен'),
-                backgroundColor: Color(0xFF4CAF50),
-              ),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Address updated'),
+                  backgroundColor: Color(0xFF4CAF50),
+                ),
+              );
+            }
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Ошибка обновления: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Update error: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         },
       ),
@@ -411,37 +348,41 @@ class _AddressListPageState extends State<AddressListPage> {
   Future<void> _deleteAddress(Address address) async {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить адрес'),
-        content: Text('Вы уверены, что хотите удалить адрес "${address.displayLabel}"?'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Address'),
+        content: Text('Are you sure you want to delete the address for "${address.fullName}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
               try {
                 await context.read<AddressesProvider>().deleteAddress(address.id);
                 await _loadAddresses();
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Адрес удален'),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
+                Navigator.pop(dialogContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Address deleted'),
+                      backgroundColor: Color(0xFF4CAF50),
+                    ),
+                  );
+                }
               } catch (e) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Ошибка удаления: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                Navigator.pop(dialogContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Delete error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -451,55 +392,42 @@ class _AddressListPageState extends State<AddressListPage> {
   void _addNewAddress() {
     showDialog(
       context: context,
-      builder: (context) => AddressForm(
+      builder: (dialogContext) => AddressForm(
         onSave: (newAddress) async {
           try {
-            print('AddressListPage: Добавляем новый адрес');
-            print('AddressListPage: label: ${newAddress.label}');
-            print('AddressListPage: streetAddress: ${newAddress.streetAddress}');
-            print('AddressListPage: apartment: ${newAddress.apartment}');
-            print('AddressListPage: city: ${newAddress.city}');
-            print('AddressListPage: postalCode: ${newAddress.postalCode}');
-            print('AddressListPage: country: ${newAddress.country}');
-            print('AddressListPage: isDefault: ${newAddress.isDefault}');
-            
+            AppLogger.debug('Adding new address', tag: 'AddressListPage');
             await context.read<AddressesProvider>().addAddress(
-              label: newAddress.label,
-              streetAddress: newAddress.streetAddress,
-              apartment: newAddress.apartment,
+              fullName: newAddress.fullName,
+              phone: newAddress.phone,
+              addressLine1: newAddress.addressLine1,
+              addressLine2: newAddress.addressLine2,
               city: newAddress.city,
               postalCode: newAddress.postalCode,
+              country: newAddress.country,
               isDefault: newAddress.isDefault,
             );
             await _loadAddresses();
-            
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Адрес добавлен'),
-                backgroundColor: Color(0xFF4CAF50),
-              ),
-            );
+            Navigator.pop(dialogContext);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Address added'),
+                  backgroundColor: Color(0xFF4CAF50),
+                ),
+              );
+            }
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Ошибка добавления: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Add error: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         },
       ),
     );
   }
-
-  void _onBottomNavTap(int index) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Навигация на индекс: $index'),
-        backgroundColor: const Color(0xFF8B4513),
-      ),
-    );
-  }
 }
-

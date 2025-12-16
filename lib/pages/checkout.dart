@@ -113,23 +113,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _isLoadingAddresses = false;
       _isLoadingMethods = false;
     });
-    // Предзаполнение полей клиента из профиля, если они пустые
+    // Pre-fill client fields from profile if empty (FastAPI uses full_name instead of first/last)
     final user = auth.currentUser;
     if (user != null) {
       if (_nameController.text.trim().isEmpty) {
-        final first = user.firstName;
-        final last = user.lastName;
-        final username = user.username;
-        final full = [first, last].where((e) => e.trim().isNotEmpty).join(' ').trim();
-        _nameController.text = InputSanitizer.sanitizeName(full.isNotEmpty ? full : username);
+        // FastAPI uses fullName (full_name) instead of firstName/lastName
+        _nameController.text = InputSanitizer.sanitizeName(user.displayName);
       }
       if (_phoneController.text.trim().isEmpty) {
-        final phone = user.phone;
-        _phoneController.text = InputSanitizer.sanitizePhone(phone);
+        _phoneController.text = InputSanitizer.sanitizePhone(user.phone);
       }
       if (_emailController.text.trim().isEmpty) {
-        final email = user.email;
-        _emailController.text = InputSanitizer.sanitizeEmail(email);
+        _emailController.text = InputSanitizer.sanitizeEmail(user.email);
       }
     }
     // Автовыбор ID и цены

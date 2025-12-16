@@ -101,25 +101,19 @@ class OrderService implements IOrderService {
         print('OrderService: Полный ответ API: ${response.body}');
 
         if (jsonBody is Map<String, dynamic>) {
-          if (jsonBody['results'] is List) {
+          // FastAPI format: { "success": true, "data": [...] }
+          if (jsonBody['data'] is List) {
+            final orders = List<Order>.from(
+              jsonBody['data'].map((order) => Order.fromJson(order))
+            );
+            print('OrderService: Loaded ${orders.length} orders from API (data)');
+            return orders;
+          } else if (jsonBody['results'] is List) {
+            // Django format fallback: { "results": [...] }
             final orders = List<Order>.from(
               jsonBody['results'].map((order) => Order.fromJson(order))
             );
-            print('OrderService: Успешно загружено ${orders.length} заказов из API (results)');
-            return orders;
-          } else if (jsonBody['data'] is List) {
-            // Некоторые API возвращают данные в поле 'data'
-            final orders = List<Order>.from(
-              jsonBody['data'].map((order) => Order.fromJson(order))
-            );
-            print('OrderService: Успешно загружено ${orders.length} заказов из API (data)');
-            return orders;
-          } else if (jsonBody['success'] == true && jsonBody['data'] is List) {
-            // API возвращает success: true, data: [...]
-            final orders = List<Order>.from(
-              jsonBody['data'].map((order) => Order.fromJson(order))
-            );
-            print('OrderService: Успешно загружено ${orders.length} заказов из API (success+data)');
+            print('OrderService: Loaded ${orders.length} orders from API (results)');
             return orders;
           }
         } else if (jsonBody is List) {
@@ -555,18 +549,19 @@ class OrderService implements IOrderService {
         try {
           final jsonBody = json.decode(response.body);
           if (jsonBody is List) {
-            print('OrderService: Успешно загружено ${jsonBody.length} методов доставки из API');
+            print('OrderService: Loaded ${jsonBody.length} delivery methods from API');
             return List<Map<String, dynamic>>.from(jsonBody);
-          } else if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
-            // Если API возвращает в формате pagination
-            final results = jsonBody['results'] as List;
-            print('OrderService: Успешно загружено ${results.length} методов доставки из API (paginated)');
-            return List<Map<String, dynamic>>.from(results);
-          } else if (jsonBody is Map<String, dynamic> && jsonBody.containsKey('count') && jsonBody.containsKey('results')) {
-            // Обработка paginated response
-            final results = jsonBody['results'] as List?;
-            if (results != null) {
-              print('OrderService: Успешно загружено ${results.length} методов доставки из API (paginated format)');
+          } else if (jsonBody is Map<String, dynamic>) {
+            // FastAPI format: { "success": true, "data": [...] }
+            if (jsonBody['data'] is List) {
+              final data = jsonBody['data'] as List;
+              print('OrderService: Loaded ${data.length} delivery methods from API (data)');
+              return List<Map<String, dynamic>>.from(data);
+            }
+            // Django format fallback: { "results": [...] }
+            if (jsonBody['results'] is List) {
+              final results = jsonBody['results'] as List;
+              print('OrderService: Loaded ${results.length} delivery methods from API (results)');
               return List<Map<String, dynamic>>.from(results);
             }
           }
@@ -609,18 +604,19 @@ class OrderService implements IOrderService {
           print('OrderService: Тело ответа: ${response.body}');
 
           if (jsonBody is List) {
-            print('OrderService: Успешно загружено ${jsonBody.length} методов оплаты из API (list)');
+            print('OrderService: Loaded ${jsonBody.length} payment methods from API (list)');
             return List<Map<String, dynamic>>.from(jsonBody);
-          } else if (jsonBody is Map<String, dynamic> && jsonBody['results'] is List) {
-            // Если API возвращает в формате pagination
-            final results = jsonBody['results'] as List;
-            print('OrderService: Успешно загружено ${results.length} методов оплаты из API (paginated)');
-            return List<Map<String, dynamic>>.from(results);
-          } else if (jsonBody is Map<String, dynamic> && jsonBody.containsKey('count') && jsonBody.containsKey('results')) {
-            // Обработка paginated response
-            final results = jsonBody['results'] as List?;
-            if (results != null) {
-              print('OrderService: Успешно загружено ${results.length} методов оплаты из API (paginated format)');
+          } else if (jsonBody is Map<String, dynamic>) {
+            // FastAPI format: { "success": true, "data": [...] }
+            if (jsonBody['data'] is List) {
+              final data = jsonBody['data'] as List;
+              print('OrderService: Loaded ${data.length} payment methods from API (data)');
+              return List<Map<String, dynamic>>.from(data);
+            }
+            // Django format fallback: { "results": [...] }
+            if (jsonBody['results'] is List) {
+              final results = jsonBody['results'] as List;
+              print('OrderService: Loaded ${results.length} payment methods from API (results)');
               return List<Map<String, dynamic>>.from(results);
             }
           }

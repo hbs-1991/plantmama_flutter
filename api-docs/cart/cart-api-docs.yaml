@@ -1,0 +1,182 @@
+openapi: 3.1.0
+info:
+  title: PlantMama Store API - Cart
+  description: |
+    Shopping cart validation and pricing endpoints.
+
+    ## Cart Flow
+    1. Client manages cart locally
+    2. Before checkout, validate cart via `/cart/validate`
+    3. Check individual product availability via `/cart/check-availability/{product_id}`
+    4. Calculate delivery fee via `/cart/delivery-fee`
+    5. Create order with validated cart data
+
+  version: 1.0.0
+  contact:
+    name: PlantMama Support
+    email: support@plantmama.com
+
+servers:
+  - url: https://api.plantmama.com/api/v1
+    description: Production API
+  - url: http://localhost:8000/api/v1
+    description: Development API (local)
+
+paths:
+  /cart/validate:
+    post:
+      tags:
+        - Cart
+      summary: Validate cart items and get pricing
+      description: |
+        Validate all items in cart, check availability, and calculate totals.
+
+        **Returns:**
+        - Item availability status
+        - Current prices for each item
+        - Inventory status
+        - Estimated delivery fee (if applicable)
+      operationId: validateCart
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '../_common/schemas.yaml#/components/schemas/CartItem'
+                delivery_method:
+                  type: string
+                  enum: [delivery, pickup]
+                region_code:
+                  type: string
+                  description: Target region for delivery
+              required:
+                - items
+      responses:
+        '200':
+          description: Cart validation successful
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/SuccessResponse_CartValidation'
+        '400':
+          description: Validation failed - items unavailable or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/schemas.yaml#/components/schemas/ErrorResponse'
+
+  /cart/check-availability/{product_id}:
+    get:
+      tags:
+        - Cart
+      summary: Check product availability and stock
+      description: |
+        Quick endpoint to check if a product is available and current stock level.
+      operationId: checkProductAvailability
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: quantity
+          in: query
+          description: Quantity to check availability for
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Stock status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      product_id:
+                        type: integer
+                      available:
+                        type: boolean
+                      available_quantity:
+                        type: integer
+                      requested_quantity:
+                        type: integer
+                      can_fulfill:
+                        type: boolean
+                      message:
+                        type: string
+
+  /cart/delivery-fee:
+    get:
+      tags:
+        - Cart
+      summary: Calculate delivery fee
+      description: |
+        Calculate estimated delivery fee based on:
+        - Delivery address
+        - Cart subtotal
+        - Region/zone
+      operationId: calculateDeliveryFee
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: subtotal
+          in: query
+          description: Cart subtotal in decimal format
+          schema:
+            type: number
+            format: decimal
+        - name: region_code
+          in: query
+          description: Delivery region code
+          schema:
+            type: string
+        - name: postal_code
+          in: query
+          description: Delivery postal code (optional, for precise calculation)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delivery fee calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      delivery_fee:
+                        type: number
+                        format: decimal
+                      free_delivery_threshold:
+                        type: number
+                        format: decimal
+                      is_free_delivery:
+                        type: boolean
+
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: '../_common/schemas.yaml#/components/securitySchemes/BearerAuth'
+
+tags:
+  - name: Cart
+    description: Shopping cart validation and pricing
